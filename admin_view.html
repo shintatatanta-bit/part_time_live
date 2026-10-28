@@ -943,7 +943,8 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         // 💡 アカウントのSlack URLを入力欄に自動セットする
         var slackInput = document.getElementById('accountSlackUrlInput');
         if (slackInput) {
-          slackInput.value = acc.slackUrl || "";
+          // ⚠️ 値が存在しない場合に空文字にする処理を少し変えます
+          slackInput.value = (acc.slackUrl !== undefined && acc.slackUrl !== null) ? acc.slackUrl : "";
         }
 
         // 💡 登録人数バッジの表示を更新（分母に変数 maxLimit を使用）
