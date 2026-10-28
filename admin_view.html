@@ -600,7 +600,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         </div>
 
         <!-- タブ1: 登録済みスタッフ一覧 -->
-        <div id="modalViewList">
+        <div id="modalViewList" class="staff-tab-content">
           <div style="overflow-x: auto; max-height: 400px;">
             <table>
               <thead><tr><th>名前</th><th>アカウント</th><th>表示文字</th><th>個別URL</th><th style="text-align: center;">ステータス</th><th>操作</th></tr></thead>
@@ -610,7 +610,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         </div>
 
         <!-- タブ2: LINE ID取得の案内・QRコード -->
-        <div id="modalViewGuide" style="display: none;">
+        <div id="modalViewGuide" class="staff-tab-content" style="display: none;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <label style="margin-top: 0;">案内するLINEアカウントを選択:</label>
             <span id="accountCountBadge" style="font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 12px;">登録人数: 0/9人</span>
@@ -627,7 +627,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
             </div>
           </div>
 
-          <!-- 💡 【移動】Slack設定エリアをこのタブの中に収める -->
+          <!-- 💡 Slack設定エリアは「新規登録案内・QR」タブの中にだけ配置する -->
           <div style="border-top: 1px solid var(--border-color); padding-top: 12px; text-align: left;">
             <label style="font-weight: bold; color: var(--text-main);">📢 このアカウントのSlack通知 Webhook URL:</label>
             <div style="display: flex; gap: 8px; margin-top: 4px;">
@@ -637,7 +637,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
           </div>
         </div>
 
-        <!-- 💡 【移動】スタッフ手動登録タブのコンテンツをここに収める -->
+        <!-- タブ3: スタッフ手動登録 -->
         <div id="staffTabManual" class="staff-tab-content" style="display: none;">
           <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left;">
             <h3 style="margin-top: 0; font-size: 1rem; color: #1e293b; font-weight: 700;">スタッフ手動登録</h3>
@@ -656,9 +656,8 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
               <input type="text" id="manualLineUserId" placeholder="例: Uef491ace4afa9..." style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
 
               <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">割当LINEアカウント</label>
-<select id="manualAssignedAccount" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; background: #fff;">
-  <!-- ここにJavaScriptでアカウント一覧が自動で入ります -->
-</select>
+              <select id="manualAssignedAccount" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; background: #fff;"></select>
+
               <button type="button" onclick="submitManualStaffRegistration()" style="background: #059669; color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; width: 100%; padding: 10px; margin-top: 16px;">この内容で手動登録する</button>
             </form>
           </div>
