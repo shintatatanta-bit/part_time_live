@@ -613,7 +613,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         <div id="modalViewGuide" style="display: none;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <label style="margin-top: 0;">案内するLINEアカウントを選択:</label>
-            <span id="accountCountBadge" style="font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 12px;">登録人数: 0/10人</span>
+            <span id="accountCountBadge" style="font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 12px;">登録人数: 0/9人</span>
           </div>
           
           <select id="targetAccountSelect" onchange="updateAccountQrGuide()" style="margin-bottom: 8px; font-weight: 600;"></select>
@@ -621,9 +621,18 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
           <label>スタッフへ送る案内文（コピーして使用）:</label>
           <textarea id="lineGuideText" rows="4" readonly style="background: #f8fafc; resize: none;"></textarea>
 
-          <div style="margin-top: 12px; text-align: center;">
+          <div style="margin-top: 12px; text-align: center; margin-bottom: 12px;">
             <div id="qrCodeDisplayBox" style="display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--border-color); border-radius: 8px;">
               <span style="font-size: 0.75rem; color: var(--text-sub);">アカウントを選択するとQRコードが表示されます</span>
+            </div>
+          </div>
+
+          <!-- 💡 【移動】Slack設定エリアをこのタブの中に収める -->
+          <div style="border-top: 1px solid var(--border-color); padding-top: 12px; text-align: left;">
+            <label style="font-weight: bold; color: var(--text-main);">📢 このアカウントのSlack通知 Webhook URL:</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <input type="text" id="accountSlackUrlInput" placeholder="https://hooks.slack.com/services/..." style="margin: 0; font-size: 0.8rem;">
+              <button type="button" class="secondary" style="background: var(--accent-color); color: #fff; border: none; white-space: nowrap;" onclick="saveSlackUrlFromGui()">URLを保存</button>
             </div>
           </div>
         </div>
