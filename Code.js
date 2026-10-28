@@ -1741,12 +1741,15 @@ function getAccountDetailsList() {
       var row = data[i];
       if (row[0]) {
         var accName = row[0];
+        // 💡 F列（6列目）の値を確実に取得するために、シートから直接セルを指定して取得する
+        var slackUrlVal = sheet.getRange(i + 1, 6).getValue() || "";
+
         accounts.push({
           name: accName,
           channelId: row[1] || "",
           addUrl: row[2] || "",
           qrUrl: row[3] || "",
-          slackUrl: row[5] || "", // 👈 F列のSlack Webhook URLを追加
+          slackUrl: String(slackUrlVal).trim(), // 👈 確実にF列のセルから取得
           count: countsMap[accName] || 0
         });
       }
