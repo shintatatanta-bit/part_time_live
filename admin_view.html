@@ -584,11 +584,13 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
           <button type="button" class="secondary" onclick="closeStaffModal()">✕ 閉じる</button>
         </div>
 
-        <!-- タブ切り替え（一覧 ＆ LINE ID案内） -->
-        <div class="view-tabs" style="margin-bottom: 16px;">
-          <button id="modalTabList" class="view-tab-btn active" onclick="switchModalTab('list')">📋 登録済みスタッフ一覧</button>
-          <button id="modalTabGuide" class="view-tab-btn" onclick="switchModalTab('guide')">📱 新規登録案内・QR</button>
-        </div>
+        <!-- タブのボタン部分 -->
+<div class="tab-buttons" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+  <button type="button" class="tab-btn active" onclick="switchStaffTab('list')">登録済みスタッフ一覧</button>
+  <button type="button" class="tab-btn" onclick="switchStaffTab('qr')">新規登録案内・QR</button>
+  <!-- 💡 ここに手動登録タブを追加 -->
+  <button type="button" class="tab-btn" onclick="switchStaffTab('manual')">➕ スタッフ手動登録</button>
+</div>
 
         <div style="background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 14px; border: 1px solid var(--border-color);">
   <label style="margin-top:0;">1アカウントあたりの登録上限人数:</label>
@@ -629,6 +631,32 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         </div>
       </div> <!-- 👈 【追加】ここで「staffManagementModal」をしっかり閉じる -->
     </div>
+
+<!-- 💡 スタッフ手動登録タブのコンテンツ -->
+<div id="staffTabManual" class="staff-tab-content" style="display: none;">
+  <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left;">
+    <h3 style="margin-top: 0; font-size: 1rem; color: #1e293b; font-weight: 700;">スタッフ手動登録</h3>
+    <p style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
+      スタッフからLINE IDを教えてもらった後、ここで必要事項を入力して手動で登録を完了させます。
+    </p>
+
+    <form id="adminManualRegForm" style="margin-top: 12px;">
+      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 8px;">スタッフ氏名（フルネーム）</label>
+      <input type="text" id="manualStaffName" placeholder="例: 山田 花子" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
+
+      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">カレンダー表示文字 (1〜4文字)</label>
+      <input type="text" id="manualDisplayChar" placeholder="例: 山田" maxlength="4" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
+
+      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">LINE ID （スタッフから聞き取ったID）</label>
+      <input type="text" id="manualLineUserId" placeholder="例: Uef491ace4afa9..." style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
+
+      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">割当LINEアカウント</label>
+      <input type="text" id="manualAssignedAccount" value="アカウントA" readonly style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; background: #e2e8f0; color: #475569; border-radius: 4px; font-size: 0.9rem;">
+
+      <button type="button" onclick="submitManualStaffRegistration()" style="background: #059669; color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; width: 100%; padding: 10px; margin-top: 16px;">この内容で手動登録する</button>
+    </form>
+  </div>
+</div>
 
     <!-- リマインド確認用モーダル -->
     <div id="reminderModal" class="modal-overlay">
@@ -2408,6 +2436,85 @@ var tooltipText = 'スタッフ名: ' + escapeHtml(sh.staffName);
           container.innerHTML = html;
         }).getDuplicateKintaiAlerts();
       }
+
+      // 💡 スタッフ管理モーダルのタブ切り替え（一覧・QR・手動登録）
+      function switchStaffTab(tabName) {
+        // すべてのタブコンテンツを隠す
+        var contents = document.querySelectorAll('.staff-tab-content');
+        for (var i = 0; i < contents.length; i++) {
+          contents[i].style.display = 'none';
+        }
+        // 既存のモーダル内ビューも切り替え
+        var viewList = document.getElementById('modalViewList');
+        var viewGuide = document.getElementById('modalViewGuide');
+        if (viewList) viewList.style.display = 'none';
+        if (viewGuide) viewGuide.style.display = 'none';
+
+        // すべてのタブボタンの active を外す
+        var buttons = document.querySelectorAll('.tab-btn');
+        for (var j = 0; j < buttons.length; j++) {
+          buttons[j].classList.remove('active');
+        }
+
+        // 選択されたタブを表示
+        if (tabName === 'list') {
+          if (viewList) viewList.style.display = 'block';
+        } else if (tabName === 'qr') {
+          if (viewGuide) viewGuide.style.display = 'block';
+        } else if (tabName === 'manual') {
+          var manualTab = document.getElementById('staffTabManual');
+          if (manualTab) manualTab.style.display = 'block';
+        }
+        
+        // クリックされたボタンに active を付与
+        if (event && event.target) {
+          event.target.classList.add('active');
+        }
+      }
+
+      // 💡 管理画面からの手動登録を実行する関数
+      function submitManualStaffRegistration() {
+        var staffName = document.getElementById('manualStaffName').value.trim();
+        var displayChar = document.getElementById('manualDisplayChar').value.trim();
+        var lineUserId = document.getElementById('manualLineUserId').value.trim();
+        var assignedAccount = document.getElementById('manualAssignedAccount').value;
+
+        if (!staffName || !displayChar || !lineUserId) {
+          alert('氏名、カレンダー表示文字、LINE IDをすべて入力してください。');
+          return;
+        }
+
+        if (!confirm('スタッフ「' + staffName + '」を手動登録しますか？')) return;
+
+        var data = {
+          staffName: staffName,
+          displayChar: displayChar,
+          lineUserId: lineUserId,
+          assignedAccount: assignedAccount
+        };
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            showToast(res.message, res.success);
+            if (res.success) {
+              document.getElementById('adminManualRegForm').reset();
+              if (typeof loadStaffList === 'function') {
+                loadStaffList();
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            alert('エラーが発生しました: ' + err.message);
+          })
+          .registerStaffByAdmin(data);
+      }
+
+      /**
+ * 💡 管理画面の手動登録タブから呼び出される登録関数
+ */
+function registerStaffByAdmin(data) {
+  return registerNewStaff(data); // 既存の登録関数を流用
+}
     </script>
   </body>
 </html>

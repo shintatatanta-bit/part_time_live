@@ -2946,3 +2946,43 @@ function getDuplicateKintaiAlerts() {
     return { success: false, duplicates: [], message: e.message };
   }
 }
+
+function registerStaffByAdmin(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('スタッフマスタ'); // またはスタッフ情報を保存しているシート名
+    if (!sheet) {
+      return { success: false, message: 'スタッフマスタシートが見つかりません。' };
+    }
+
+    // 重複チェック（LINE IDや氏名など）
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      var values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+      for (var i = 0; i < values.length; i++) {
+        // 例: LINE IDの列が一致していないかチェック (列のインデックスは実際の環境に合わせて調整)
+        // if (values[i][LINE_ID_COL] === data.lineUserId) { ... }
+      }
+    }
+
+    // スタッフ情報の行を追加
+    sheet.appendRow([
+      data.staffId || Utilities.getUuid(), // スタッフID
+      data.staffName,                      // 氏名
+      data.displayChar,                    // カレンダー表示文字
+      data.assignedAccount,                // 割当アカウント
+      data.lineUserId                      // LINE ID
+    ]);
+
+    return { success: true, message: 'スタッフを手動で登録しました！' };
+  } catch (err) {
+    return { success: false, message: 'エラーが発生しました: ' + err.message };
+  }
+}
+
+/**
+ * 💡 管理画面の手動登録タブから呼び出される登録関数
+ */
+function registerStaffByAdmin(data) {
+  return registerNewStaff(data);
+}
