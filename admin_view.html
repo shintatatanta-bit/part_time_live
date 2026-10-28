@@ -576,7 +576,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
       </div>
     </div>
 
-    <!-- ⚙️ スタッフ管理 モーダルポップアップ（新規登録フォーム削除・2タブ化） -->
+       <!-- ⚙️ スタッフ管理 モーダルポップアップ -->
     <div id="staffManagementModal" class="modal-overlay">
       <div class="modal-content" style="max-width: 620px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px;">
@@ -585,20 +585,19 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         </div>
 
         <!-- タブのボタン部分 -->
-<div class="tab-buttons" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-  <button type="button" class="tab-btn active" onclick="switchStaffTab('list')">登録済みスタッフ一覧</button>
-  <button type="button" class="tab-btn" onclick="switchStaffTab('qr')">新規登録案内・QR</button>
-  <!-- 💡 ここに手動登録タブを追加 -->
-  <button type="button" class="tab-btn" onclick="switchStaffTab('manual')">➕ スタッフ手動登録</button>
-</div>
+        <div class="tab-buttons" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+          <button type="button" class="tab-btn active" onclick="switchStaffTab('list')">登録済みスタッフ一覧</button>
+          <button type="button" class="tab-btn" onclick="switchStaffTab('qr')">新規登録案内・QR</button>
+          <button type="button" class="tab-btn" onclick="switchStaffTab('manual')">➕ スタッフ手動登録</button>
+        </div>
 
         <div style="background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 14px; border: 1px solid var(--border-color);">
-  <label style="margin-top:0;">1アカウントあたりの登録上限人数:</label>
-  <div style="display: flex; gap: 8px; margin-top: 4px;">
-    <input type="number" id="maxStaffLimitInput" value="9" min="1" max="50" style="width: 100px; margin:0;">
-    <button type="button" class="secondary" style="background: var(--accent-color); color: #fff; border:none;" onclick="saveMaxLimit()">上限を保存</button>
-  </div>
-</div>
+          <label style="margin-top:0;">1アカウントあたりの登録上限人数:</label>
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <input type="number" id="maxStaffLimitInput" value="9" min="1" max="50" style="width: 100px; margin:0;">
+            <button type="button" class="secondary" style="background: var(--accent-color); color: #fff; border:none;" onclick="saveMaxLimit()">上限を保存</button>
+          </div>
+        </div>
 
         <!-- タブ1: 登録済みスタッフ一覧 -->
         <div id="modalViewList">
@@ -614,7 +613,6 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         <div id="modalViewGuide" style="display: none;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <label style="margin-top: 0;">案内するLINEアカウントを選択:</label>
-            <!-- 💡 登録人数の表示バッジ -->
             <span id="accountCountBadge" style="font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 12px;">登録人数: 0/10人</span>
           </div>
           
@@ -629,34 +627,35 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
             </div>
           </div>
         </div>
-      </div> <!-- 👈 【追加】ここで「staffManagementModal」をしっかり閉じる -->
-    </div>
 
-<!-- 💡 スタッフ手動登録タブのコンテンツ -->
-<div id="staffTabManual" class="staff-tab-content" style="display: none;">
-  <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left;">
-    <h3 style="margin-top: 0; font-size: 1rem; color: #1e293b; font-weight: 700;">スタッフ手動登録</h3>
-    <p style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
-      スタッフからLINE IDを教えてもらった後、ここで必要事項を入力して手動で登録を完了させます。
-    </p>
+        <!-- 💡 【移動】スタッフ手動登録タブのコンテンツをここに収める -->
+        <div id="staffTabManual" class="staff-tab-content" style="display: none;">
+          <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left;">
+            <h3 style="margin-top: 0; font-size: 1rem; color: #1e293b; font-weight: 700;">スタッフ手動登録</h3>
+            <p style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
+              スタッフからLINE IDを教えてもらった後、ここで必要事項を入力して手動で登録を完了させます。
+            </p>
 
-    <form id="adminManualRegForm" style="margin-top: 12px;">
-      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 8px;">スタッフ氏名（フルネーム）</label>
-      <input type="text" id="manualStaffName" placeholder="例: 山田 花子" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
+            <form id="adminManualRegForm" style="margin-top: 12px;">
+              <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 8px;">スタッフ氏名（フルネーム）</label>
+              <input type="text" id="manualStaffName" placeholder="例: 山田 花子" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
 
-      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">カレンダー表示文字 (1〜4文字)</label>
-      <input type="text" id="manualDisplayChar" placeholder="例: 山田" maxlength="4" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
+              <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">カレンダー表示文字 (1〜4文字)</label>
+              <input type="text" id="manualDisplayChar" placeholder="例: 山田" maxlength="4" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
 
-      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">LINE ID （スタッフから聞き取ったID）</label>
-      <input type="text" id="manualLineUserId" placeholder="例: Uef491ace4afa9..." style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
+              <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">LINE ID （スタッフから聞き取ったID）</label>
+              <input type="text" id="manualLineUserId" placeholder="例: Uef491ace4afa9..." style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
 
-      <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">割当LINEアカウント</label>
-      <input type="text" id="manualAssignedAccount" value="アカウントA" readonly style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; background: #e2e8f0; color: #475569; border-radius: 4px; font-size: 0.9rem;">
+              <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">割当LINEアカウント</label>
+              <input type="text" id="manualAssignedAccount" value="アカウントA" readonly style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; background: #e2e8f0; color: #475569; border-radius: 4px; font-size: 0.9rem;">
 
-      <button type="button" onclick="submitManualStaffRegistration()" style="background: #059669; color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; width: 100%; padding: 10px; margin-top: 16px;">この内容で手動登録する</button>
-    </form>
-  </div>
-</div>
+              <button type="button" onclick="submitManualStaffRegistration()" style="background: #059669; color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; width: 100%; padding: 10px; margin-top: 16px;">この内容で手動登録する</button>
+            </form>
+          </div>
+        </div>
+
+      </div> <!-- modal-content の閉じタグ -->
+    </div> <!-- staffManagementModal の閉じタグ -->
 
     <!-- リマインド確認用モーダル -->
     <div id="reminderModal" class="modal-overlay">
