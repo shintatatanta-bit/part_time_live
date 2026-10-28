@@ -3024,3 +3024,18 @@ function saveAccountSlackUrl(data) {
     return { success: false, message: "保存エラー: " + e.message };
   }
 }
+
+function debugCheckSlackUrl() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("アカウントマスタ");
+  if (!sheet) {
+    Logger.log("「アカウントマスタ」シートが見つかりません");
+    return;
+  }
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var accName = data[i][0];
+    var slackUrlVal = sheet.getRange(i + 1, 6).getValue();
+    Logger.log("行 " + (i + 1) + " | アカウント: " + accName + " | F列の値: [" + slackUrlVal + "]");
+  }
+}
