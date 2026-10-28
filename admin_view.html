@@ -921,7 +921,15 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
 
       function updateAccountQrGuide() {
         var select = document.getElementById('targetAccountSelect');
+        if (!select) return;
         var idx = select.value;
+        
+        // 💡 選択インデックスが空または無効な場合は、最初の要素（"0"）を強制選択してみる
+        if (idx === "" && cachedAccountDetails.length > 0) {
+          select.value = "0";
+          idx = "0";
+        }
+
         if (idx === "" || !cachedAccountDetails[idx]) return;
 
         var acc = cachedAccountDetails[idx];
@@ -932,11 +940,11 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         var limitInput = document.getElementById('maxStaffLimitInput');
         var maxLimit = limitInput ? Number(limitInput.value) || 9 : 9;
 
-// 💡 【追加】アカウントを切り替えたときに、そのアカウントのSlack URLを入力欄に自動セットする
-    var slackInput = document.getElementById('accountSlackUrlInput');
-    if (slackInput) {
-      slackInput.value = acc.slackUrl || "";
-    }
+        // 💡 アカウントのSlack URLを入力欄に自動セットする
+        var slackInput = document.getElementById('accountSlackUrlInput');
+        if (slackInput) {
+          slackInput.value = acc.slackUrl || "";
+        }
 
         // 💡 登録人数バッジの表示を更新（分母に変数 maxLimit を使用）
         var badge = document.getElementById('accountCountBadge');
@@ -957,8 +965,8 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
 
         // 💡 【判定】現在人数が上限（maxLimit）以上の場合はQRコードや案内文を非表示にする
         if (currentCount >= maxLimit) {
-          guideTextarea.value = "⚠️ 「" + acc.name + "」は登録上限（" + maxLimit + "名）に達しているため、現在新規の案内を停止しています。";
-          qrBox.innerHTML = '<div style="padding: 15px; font-size: 0.8rem; color: var(--danger-color); background: #fee2e2; border-radius: 6px; text-align: center;">' +
+          if (guideTextarea) guideTextarea.value = "⚠️ 「" + acc.name + "」は登録上限（" + maxLimit + "名）に達しているため、現在新規の案内を停止しています。";
+          if (qrBox) qrBox.innerHTML = '<div style="padding: 15px; font-size: 0.8rem; color: var(--danger-color); background: #fee2e2; border-radius: 6px; text-align: center;">' +
                             '<strong>⚠️ 上限到達のためQR非表示</strong><br>このアカウントは満員です。</div>';
           return;
         }
@@ -966,18 +974,21 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         // 上限に達していない場合は通常の案内文とQRコードを表示
         var guideText = 
           "お疲れ様です！\n" +
-          "勤怠管理システム連携のため、以下のリンクから「" + acc.name + "」を友だち追加し、トーク画面で「登録」と送信して手続きを進めてください。\n\n" +
+          "勤怠管理システム連携のため、以下のリンクから「" + acc.name + "」を友だち追加し、トーク画面で " +
+          "「登録」と送信して手続きを進めてください。\n\n" +
           "▼ 友だち追加リンク\n" + addUrl;
 
-        guideTextarea.value = guideText;
+        if (guideTextarea) guideTextarea.value = guideText;
 
-        if (acc.qrUrl) {
-          qrBox.innerHTML = '<img src="' + escapeHtml(acc.qrUrl) + '" alt="QRコード" style="width: 120px; height: 120px; display: block; margin: 0 auto;">' +
-                            '<span style="font-size: 0.7rem; color: var(--text-sub); display: block; margin-top: 4px;">' + escapeHtml(acc.name) + ' のQRコード</span>';
-        } else {
-          qrBox.innerHTML = '<div style="padding: 10px; font-size: 0.75rem; color: var(--text-sub); background: #f8fafc;">' +
-                            '<strong>' + escapeHtml(acc.name) + '</strong><br>※QRコード画像URLが未登録です' +
-                            '</div>';
+        if (qrBox) {
+          if (acc.qrUrl) {
+            qrBox.innerHTML = '<img src="' + escapeHtml(acc.qrUrl) + '" alt="QRコード" style="width: 120px; height: 120px; display: block; margin: 0 auto;">' +
+                              '<span style="font-size: 0.7rem; color: var(--text-sub); display: block; margin-top: 4px;">' + escapeHtml(acc.name) + ' のQRコード</span>';
+          } else {
+            qrBox.innerHTML = '<div style="padding: 10px; font-size: 0.75rem; color: var(--text-sub); background: #f8fafc;">' +
+                              '<strong>' + escapeHtml(acc.name) + '</strong><br>※QRコード画像URLが未登録です' +
+                              '</div>';
+          }
         }
       }
 
