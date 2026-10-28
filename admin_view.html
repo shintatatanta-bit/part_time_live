@@ -655,6 +655,15 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
           </div>
         </div>
 
+        <!-- 案内用タブの中に追加するSlack設定エリア -->
+<div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+  <label style="font-weight: bold; color: var(--text-main);">📢 このアカウントのSlack通知 Webhook URL:</label>
+  <div style="display: flex; gap: 8px; margin-top: 4px;">
+    <input type="text" id="accountSlackUrlInput" placeholder="https://hooks.slack.com/services/..." style="margin: 0; font-size: 0.8rem;">
+    <button type="button" class="secondary" style="background: var(--accent-color); color: #fff; border: none; white-space: nowrap;" onclick="saveSlackUrlFromGui()">URLを保存</button>
+  </div>
+</div>
+
       </div> <!-- modal-content の閉じタグ -->
     </div> <!-- staffManagementModal の閉じタグ -->
 
@@ -920,6 +929,12 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         // 💡 画面上の入力ボックス（またはデフォルト9）から上限人数を正確に取得する
         var limitInput = document.getElementById('maxStaffLimitInput');
         var maxLimit = limitInput ? Number(limitInput.value) || 9 : 9;
+
+// 💡 【追加】アカウントを切り替えたときに、そのアカウントのSlack URLを入力欄に自動セットする
+    var slackInput = document.getElementById('accountSlackUrlInput');
+    if (slackInput) {
+      slackInput.value = acc.slackUrl || "";
+    }
 
         // 💡 登録人数バッジの表示を更新（分母に変数 maxLimit を使用）
         var badge = document.getElementById('accountCountBadge');

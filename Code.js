@@ -8,10 +8,10 @@ function doPost(e) {
   try {
     var contents = JSON.parse(e.postData.contents);
     var events = contents.events;
-    var destination = contents.destination; // 💡 LINEから送られてきた宛先ボットのID (Uから始まる文字列)
+    var destination = contents.destination; // 宛先ボットのID
     
-    // 💡 宛先ID（destination）から、該当するアカウントのアクセストークンを特定する
     var accessToken = getAccessTokenByDestination(destination);
+    var accountName = getAccountNameByDestination(destination); // 💡 アカウント名を特定
     
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
@@ -21,23 +21,28 @@ function doPost(e) {
         var lineUserId = event.source.userId;
         var replyToken = event.replyToken;
         
+        // 🚀 【追加】どのアカウントに届いたメッセージでも、すべてSlackに飛ばす！
+        sendToSlack(accountName, lineUserId, userMessage);
+        
+        // 既存の「登録」などのキーワード判定処理
         if (userMessage === "登録" || userMessage === "ID確認" || userMessage === "id") {
           saveLineIdLog(lineUserId);
           
-          // ▼ アカウント名を特定してURLに付与する ▼
-          var accountName = getAccountNameByDestination(destination);
           var webAppUrl = ScriptApp.getService().getUrl();
           var registerUrl = webAppUrl + "?page=register&account=" + encodeURIComponent(accountName);
           
           var messages = [
             { type: "text", text: "お疲れ様です！スタッフ登録を行います。\n\n① まず以下のご自身の【LINE ID】をコピーしてください👇" },
+            { type: "text", text: "＝＝＝＝" },
             { type: "text", text: lineUserId },
+            { type: "text", text: "＝＝＝＝" },
             { type: "text", text: "② 次に、以下のリンクから登録フォームを開き、コピーしたLINE IDを貼り付けてください。" },
+            { type: "text", text: "＝＝＝＝" },
             { type: "text", text: "▼ スタッフ初回登録ページ" },
+            { type: "text", text: "＝＝＝＝" },
             { type: "text", text: registerUrl }
           ];
           
-          // 💡 特定したアクセストークンを使って返信する
           sendLineMultipleRepliesWithToken(replyToken, messages, accessToken);
         }
       }
@@ -1713,7 +1718,6 @@ function checkAndLinkStaffAccess(staffId, lineUserId) {
 function getAccountDetailsList() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    
     var staffSheet = ss.getSheetByName("スタッフマスタ");
     var countsMap = {};
     if (staffSheet) {
@@ -1728,12 +1732,7 @@ function getAccountDetailsList() {
     }
 
     var sheet = ss.getSheetByName("アカウントマスタ");
-    if (!sheet) {
-      return [
-        { name: "アカウントA", addUrl: "https://lin.ee/xxxxxA", qrUrl: "", count: countsMap["アカウントA"] || 0 },
-        { name: "アカウントB", addUrl: "https://lin.ee/xxxxxB", qrUrl: "", count: countsMap["アカウントB"] || 0 }
-      ];
-    }
+    if (!sheet) return [];
     
     var data = sheet.getDataRange().getValues();
     var accounts = [];
@@ -1745,13 +1744,14 @@ function getAccountDetailsList() {
         accounts.push({
           name: accName,
           channelId: row[1] || "",
-          addUrl: row[2] || "https://lin.ee/default",
+          addUrl: row[2] || "",
           qrUrl: row[3] || "",
+          slackUrl: row[5] || "", // 👈 F列のSlack Webhook URLを追加
           count: countsMap[accName] || 0
         });
       }
     }
-    return accounts.length > 0 ? accounts : [{ name: "アカウントA", addUrl: "", qrUrl: "", count: 0 }];
+    return accounts;
   } catch (error) {
     return [];
   }
@@ -2956,4 +2956,68 @@ function getDuplicateKintaiAlerts() {
  */
 function registerStaffByAdmin(data) {
   return registerNewStaff(data);
+}
+
+/**
+ * 💡 アカウントマスタのF列からSlack URLを引いて転送する関数
+ */
+function sendToSlack(accountName, lineUserId, messageText) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("アカウントマスタ");
+    if (!sheet) return;
+    
+    var data = sheet.getDataRange().getValues();
+    var slackWebhookUrl = "";
+    
+    // アカウント名（A列）に一致する行のF列（6列目）からWebhook URLを取得する
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(accountName).trim()) {
+        slackWebhookUrl = data[i][5] ? String(data[i][5]).trim() : ""; // 6列目がSlack URL
+        break;
+      }
+    }
+    
+    // URLが未設定の場合は送信しない
+    if (!slackWebhookUrl || slackWebhookUrl.indexOf("http") !== 0) return;
+    
+    var payload = {
+      text: "📩 *【" + accountName + "】にメッセージが届きました*\n" +
+            "• *LINEユーザーID:* `" + lineUserId + "`\n" +
+            "• *メッセージ:* " + messageText
+    };
+    
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    UrlFetchApp.fetch(slackWebhookUrl, options);
+  } catch (e) {
+    Logger.log("Slack送信エラー: " + e.message);
+  }
+}
+
+/**
+ * 💡 アカウントごとのSlack Webhook URLを保存する関数
+ */
+function saveAccountSlackUrl(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("アカウントマスタ");
+    if (!sheet) return { success: false, message: "アカウントマスタが見つかりません" };
+    
+    var values = sheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][0]).trim() === String(data.accountName).trim()) {
+        sheet.getRange(i + 1, 6).setValue(data.slackUrl); // F列（6列目）に保存
+        return { success: true, message: "SlackのWebhook URLを保存しました！" };
+      }
+    }
+    return { success: false, message: "対象のアカウントが見つかりませんでした" };
+  } catch (e) {
+    return { success: false, message: "保存エラー: " + e.message };
+  }
 }
