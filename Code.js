@@ -31,8 +31,13 @@ function doPost(e) {
           
           var messages = [
             { type: "text", text: "お疲れ様です！スタッフ登録を行います。\n\n① まず以下のご自身の【LINE ID】をコピーしてください👇" },
+            { type: "text", text: "＝＝＝＝" },
             { type: "text", text: lineUserId },
-            { type: "text", text: "② 次に、以下のリンクから登録フォームを開き、コピーしたLINE IDを貼り付けてください。\n\n▼ スタッフ初回登録ページ\n" + registerUrl }
+            { type: "text", text: "＝＝＝＝" },
+            { type: "text", text: "② 次に、以下のリンクから登録フォームを開き、コピーしたLINE IDを貼り付けてください。" },
+            { type: "text", text: "＝＝＝＝" },
+            { type: "text", text: "▼ スタッフ初回登録ページ\n" + registerUrl },
+            { type: "text", text: "＝＝＝＝" }
           ];
           
           // 💡 特定したアクセストークンを使って返信する
