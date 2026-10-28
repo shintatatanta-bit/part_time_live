@@ -4,7 +4,8 @@
         {
             "label": "GAS & Git 一括デプロイ",
             "type": "shell",
-            "command": "clasp push; clasp deploy --deploymentId AKfycbyQrFYen1LKTXf9Pv8UKCDDe4Y-RrGBXA-6PDgQ0KAlNktibdpwVHRo-lDoqfLn_2g0Zg --description \"${input:commitMessage}\"; git add .; git commit -m \"${input:commitMessage}\"; git push",
+            "command": "clasp push; clasp deploy --deploymentId AKfycbwVOQxtVk93Zui1lKvjUm-5MyyqVmyB4GWQvM1DJl-wLnMWqY9ix7HdFIRaqDyCePJs --description \"${input:commitMessage}\"; git add .; git commit -m \"${input:commitMessage}\"; git push",
+
             "group": {
                 "kind": "build",
                 "isDefault": true
