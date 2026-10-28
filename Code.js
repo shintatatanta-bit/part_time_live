@@ -401,7 +401,7 @@ function registerNewStaff(formData) {
     sheet.appendRow([
       staffId,
       formData.staffName,
-      "", 
+      formData.lineUserId || "", // 👈 ここに手動入力されたLINE IDを格納する！
       formData.assignedAccount,
       "有効",
       timestamp,
