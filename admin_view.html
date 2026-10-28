@@ -647,8 +647,9 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
               <input type="text" id="manualLineUserId" placeholder="例: Uef491ace4afa9..." style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
 
               <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">割当LINEアカウント</label>
-              <input type="text" id="manualAssignedAccount" value="アカウントA" readonly style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; background: #e2e8f0; color: #475569; border-radius: 4px; font-size: 0.9rem;">
-
+<select id="manualAssignedAccount" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; background: #fff;">
+  <!-- ここにJavaScriptでアカウント一覧が自動で入ります -->
+</select>
               <button type="button" onclick="submitManualStaffRegistration()" style="background: #059669; color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; width: 100%; padding: 10px; margin-top: 16px;">この内容で手動登録する</button>
             </form>
           </div>
@@ -2514,6 +2515,24 @@ var tooltipText = 'スタッフ名: ' + escapeHtml(sh.staffName);
 function registerStaffByAdmin(data) {
   return registerNewStaff(data); // 既存の登録関数を流用
 }
+
+function loadAccountOptions() {
+        google.script.run.withSuccessHandler(function(accounts) {
+          // 💡 管理画面の既存のセレクトボックスと、手動登録用のセレクトボックス両方に反映させる
+          var accountsList = accounts || ["アカウントA", "アカウントB"];
+          
+          var selectReg = document.getElementById('assignedAccount'); // （もしあれば）
+          var selectManual = document.getElementById('manualAssignedAccount'); // 💡 手動登録用のセレクトボックス
+          
+          var html = '';
+          accountsList.forEach(function(acc) { 
+            html += '<option value="' + escapeHtml(acc) + '">' + escapeHtml(acc) + '</option>'; 
+          });
+
+          if (selectReg) selectReg.innerHTML = html;
+          if (selectManual) selectManual.innerHTML = html; // 手動登録側にアカウント一覧をセット
+        }).getAccountList();
+      }
     </script>
   </body>
 </html>
