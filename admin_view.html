@@ -600,7 +600,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         </div>
 
         <!-- タブ1: 登録済みスタッフ一覧 -->
-        <div id="modalViewList">
+        <div id="modalViewList" class="staff-tab-content">
           <div style="overflow-x: auto; max-height: 400px;">
             <table>
               <thead><tr><th>名前</th><th>アカウント</th><th>表示文字</th><th>個別URL</th><th style="text-align: center;">ステータス</th><th>操作</th></tr></thead>
@@ -610,10 +610,10 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         </div>
 
         <!-- タブ2: LINE ID取得の案内・QRコード -->
-        <div id="modalViewGuide" style="display: none;">
+        <div id="modalViewGuide" class="staff-tab-content" style="display: none;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <label style="margin-top: 0;">案内するLINEアカウントを選択:</label>
-            <span id="accountCountBadge" style="font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 12px;">登録人数: 0/10人</span>
+            <span id="accountCountBadge" style="font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 12px;">登録人数: 0/9人</span>
           </div>
           
           <select id="targetAccountSelect" onchange="updateAccountQrGuide()" style="margin-bottom: 8px; font-weight: 600;"></select>
@@ -621,14 +621,23 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
           <label>スタッフへ送る案内文（コピーして使用）:</label>
           <textarea id="lineGuideText" rows="4" readonly style="background: #f8fafc; resize: none;"></textarea>
 
-          <div style="margin-top: 12px; text-align: center;">
+          <div style="margin-top: 12px; text-align: center; margin-bottom: 12px;">
             <div id="qrCodeDisplayBox" style="display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--border-color); border-radius: 8px;">
               <span style="font-size: 0.75rem; color: var(--text-sub);">アカウントを選択するとQRコードが表示されます</span>
             </div>
           </div>
+
+          <!-- 💡 Slack設定エリアは、このタブの中に「1つだけ」配置する -->
+          <div style="border-top: 1px solid var(--border-color); padding-top: 12px; text-align: left;">
+            <label style="font-weight: bold; color: var(--text-main);">📢 このアカウントのSlack通知 Webhook URL:</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <input type="text" id="accountSlackUrlInput" placeholder="https://hooks.slack.com/services/..." style="margin: 0; font-size: 0.8rem;">
+              <button type="button" class="secondary" style="background: var(--accent-color); color: #fff; border: none; white-space: nowrap;" onclick="saveSlackUrlFromGui()">URLを保存</button>
+            </div>
+          </div>
         </div>
 
-        <!-- 💡 【移動】スタッフ手動登録タブのコンテンツをここに収める -->
+        <!-- タブ3: スタッフ手動登録 -->
         <div id="staffTabManual" class="staff-tab-content" style="display: none;">
           <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left;">
             <h3 style="margin-top: 0; font-size: 1rem; color: #1e293b; font-weight: 700;">スタッフ手動登録</h3>
@@ -647,9 +656,8 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
               <input type="text" id="manualLineUserId" placeholder="例: Uef491ace4afa9..." style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;">
 
               <label style="display: block; font-weight: bold; font-size: 0.8rem; color: #475569; margin-top: 10px;">割当LINEアカウント</label>
-<select id="manualAssignedAccount" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; background: #fff;">
-  <!-- ここにJavaScriptでアカウント一覧が自動で入ります -->
-</select>
+              <select id="manualAssignedAccount" style="width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; background: #fff;"></select>
+
               <button type="button" onclick="submitManualStaffRegistration()" style="background: #059669; color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; width: 100%; padding: 10px; margin-top: 16px;">この内容で手動登録する</button>
             </form>
           </div>
@@ -904,13 +912,24 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
             html += '<option value="' + idx + '">' + escapeHtml(acc.name) + '</option>';
           });
           select.innerHTML = html;
+          
+          select.value = "0"; // 👈 【追加】最初のアカウントを自動で選択状態にする
+          
           updateAccountQrGuide();
         }).getAccountDetailsList();
       }
 
       function updateAccountQrGuide() {
         var select = document.getElementById('targetAccountSelect');
+        if (!select) return;
         var idx = select.value;
+        
+        // 💡 選択インデックスが空または無効な場合は、最初の要素（"0"）を強制選択してみる
+        if (idx === "" && cachedAccountDetails.length > 0) {
+          select.value = "0";
+          idx = "0";
+        }
+
         if (idx === "" || !cachedAccountDetails[idx]) return;
 
         var acc = cachedAccountDetails[idx];
@@ -920,6 +939,13 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         // 💡 画面上の入力ボックス（またはデフォルト9）から上限人数を正確に取得する
         var limitInput = document.getElementById('maxStaffLimitInput');
         var maxLimit = limitInput ? Number(limitInput.value) || 9 : 9;
+
+        // 💡 アカウントのSlack URLを入力欄に自動セットする
+        var slackInput = document.getElementById('accountSlackUrlInput');
+        if (slackInput) {
+          // ⚠️ 値が存在しない場合に空文字にする処理を少し変えます
+          slackInput.value = (acc.slackUrl !== undefined && acc.slackUrl !== null) ? acc.slackUrl : "";
+        }
 
         // 💡 登録人数バッジの表示を更新（分母に変数 maxLimit を使用）
         var badge = document.getElementById('accountCountBadge');
@@ -940,8 +966,8 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
 
         // 💡 【判定】現在人数が上限（maxLimit）以上の場合はQRコードや案内文を非表示にする
         if (currentCount >= maxLimit) {
-          guideTextarea.value = "⚠️ 「" + acc.name + "」は登録上限（" + maxLimit + "名）に達しているため、現在新規の案内を停止しています。";
-          qrBox.innerHTML = '<div style="padding: 15px; font-size: 0.8rem; color: var(--danger-color); background: #fee2e2; border-radius: 6px; text-align: center;">' +
+          if (guideTextarea) guideTextarea.value = "⚠️ 「" + acc.name + "」は登録上限（" + maxLimit + "名）に達しているため、現在新規の案内を停止しています。";
+          if (qrBox) qrBox.innerHTML = '<div style="padding: 15px; font-size: 0.8rem; color: var(--danger-color); background: #fee2e2; border-radius: 6px; text-align: center;">' +
                             '<strong>⚠️ 上限到達のためQR非表示</strong><br>このアカウントは満員です。</div>';
           return;
         }
@@ -949,18 +975,21 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         // 上限に達していない場合は通常の案内文とQRコードを表示
         var guideText = 
           "お疲れ様です！\n" +
-          "勤怠管理システム連携のため、以下のリンクから「" + acc.name + "」を友だち追加し、トーク画面で「登録」と送信して手続きを進めてください。\n\n" +
+          "勤怠管理システム連携のため、以下のリンクから「" + acc.name + "」を友だち追加し、トーク画面で " +
+          "「登録」と送信して手続きを進めてください。\n\n" +
           "▼ 友だち追加リンク\n" + addUrl;
 
-        guideTextarea.value = guideText;
+        if (guideTextarea) guideTextarea.value = guideText;
 
-        if (acc.qrUrl) {
-          qrBox.innerHTML = '<img src="' + escapeHtml(acc.qrUrl) + '" alt="QRコード" style="width: 120px; height: 120px; display: block; margin: 0 auto;">' +
-                            '<span style="font-size: 0.7rem; color: var(--text-sub); display: block; margin-top: 4px;">' + escapeHtml(acc.name) + ' のQRコード</span>';
-        } else {
-          qrBox.innerHTML = '<div style="padding: 10px; font-size: 0.75rem; color: var(--text-sub); background: #f8fafc;">' +
-                            '<strong>' + escapeHtml(acc.name) + '</strong><br>※QRコード画像URLが未登録です' +
-                            '</div>';
+        if (qrBox) {
+          if (acc.qrUrl) {
+            qrBox.innerHTML = '<img src="' + escapeHtml(acc.qrUrl) + '" alt="QRコード" style="width: 120px; height: 120px; display: block; margin: 0 auto;">' +
+                              '<span style="font-size: 0.7rem; color: var(--text-sub); display: block; margin-top: 4px;">' + escapeHtml(acc.name) + ' のQRコード</span>';
+          } else {
+            qrBox.innerHTML = '<div style="padding: 10px; font-size: 0.75rem; color: var(--text-sub); background: #f8fafc;">' +
+                              '<strong>' + escapeHtml(acc.name) + '</strong><br>※QRコード画像URLが未登録です' +
+                              '</div>';
+          }
         }
       }
 
@@ -2533,6 +2562,26 @@ function loadAccountOptions() {
           if (selectManual) selectManual.innerHTML = html; // 手動登録側にアカウント一覧をセット
         }).getAccountList();
       }
+
+      function saveSlackUrlFromGui() {
+  var select = document.getElementById('targetAccountSelect');
+  var idx = select.value;
+  if (idx === "" || !cachedAccountDetails[idx]) {
+    alert("アカウントを選択してください。");
+    return;
+  }
+  var accName = cachedAccountDetails[idx].name;
+  var slackUrl = document.getElementById('accountSlackUrlInput').value.trim();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      showToast(res.message, res.success);
+      if (res.success) {
+        loadAccountQrOptions();
+      }
+    })
+    .saveAccountSlackUrl({ accountName: accName, slackUrl: slackUrl });
+}
     </script>
   </body>
 </html>

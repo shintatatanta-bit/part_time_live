@@ -1,16 +1,26 @@
 {
-  "scriptId": "1txoIzf6PB6Rc41O9m1QlCWJytuMmA6v8Ent09JTRkMl-YFeP5GBGLbps",
-  "rootDir": "",
-  "scriptExtensions": [
-    ".js",
-    ".gs"
-  ],
-  "htmlExtensions": [
-    ".html"
-  ],
-  "jsonExtensions": [
-    ".json"
-  ],
-  "filePushOrder": [],
-  "skipSubdirectories": false
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "GAS & Git 一括デプロイ",
+            "type": "shell",
+            "command": "clasp push; git add .; git commit -m \"${input:commitMessage}\"; git push",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "commitMessage",
+            "type": "promptString",
+            "description": "今回の変更メモ（コミットメッセージ）を入力してください："
+        }
+    ]
 }
