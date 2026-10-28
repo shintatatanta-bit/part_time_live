@@ -8,13 +8,16 @@
     <!-- LINEのLIFF SDKを読み込み -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-      body { font-family: sans-serif; margin: 0; padding: 16px; background: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: center; min-height: 90vh; box-sizing: border-box; }
-      .card { background: #fff; padding: 24px; border-radius: 8px; max-width: 400px; width: 100%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+      /* 変更前: body { font-family: sans-serif; margin: 0; padding: 16px; background: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: center; min-height: 90vh; box-sizing: border-box; } */
+      
+      /* 変更後: スマホで上下にスクロールできるようにし、ボタンが画面外や押しにくい位置に固定されるのを防ぐ */
+      body { font-family: sans-serif; margin: 0; padding: 16px 16px 40px 16px; background: #f4f7f6; color: #333; min-height: 100vh; box-sizing: border-box; }
+      .card { background: #fff; padding: 24px; border-radius: 8px; max-width: 400px; width: 100%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 0 auto; }
       h2 { color: #2c3e50; font-size: 1.2rem; text-align: center; margin-top: 0; }
       p { font-size: 0.85rem; color: #666; line-height: 1.4; }
       label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.85rem; color: #555; }
       input, select { width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-      button { background: #27ae60; color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 20px; padding: 12px; }
+      button { background: #27ae60; color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 20px; padding: 12px; -webkit-appearance: none; } /* -webkit-appearance: none を追加してiOSのボタン標準スタイルを無効化 */
       button:hover { background: #219653; }
       .help-box { background: #eef5fb; border-left: 4px solid #3498db; padding: 10px; font-size: 0.75rem; color: #333; margin-top: 12px; border-radius: 0 4px 4px 0; }
     </style>
@@ -44,7 +47,7 @@
           3. 氏名と表示文字を入力して登録ボタンを押してください。
         </div>
         
-        <button type="button" onclick="submitRegistration()">登録して専用URLを発行する</button>
+<button type="button" id="submitBtn" onclick="submitRegistration()">登録して専用URLを発行する</button>
       </form>
     </div>
 
@@ -76,9 +79,12 @@
 
         if (!confirm('この内容で登録してよろしいですか？')) return;
 
-        var btn = event.target;
-        btn.disabled = true;
-        btn.innerText = '登録中...';
+        // event.targetではなくidで確実にボタンを取得
+        var btn = document.getElementById('submitBtn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerText = '登録中...';
+        }
 
         google.script.run
           .withSuccessHandler(function(res) {
@@ -86,13 +92,17 @@
             if (res.success) {
               document.getElementById('regForm').reset();
             }
-            btn.disabled = false;
-            btn.innerText = '登録して専用URLを発行する';
+            if (btn) {
+              btn.disabled = false;
+              btn.innerText = '登録して専用URLを発行する';
+            }
           })
           .withFailureHandler(function(err) {
             alert('エラーが発生しました: ' + err.message);
-            btn.disabled = false;
-            btn.innerText = '登録して専用URLを発行する';
+            if (btn) {
+              btn.disabled = false;
+              btn.innerText = '登録して専用URLを発行する';
+            }
           })
           .registerStaffBySelf({
             staffName: staffName,
