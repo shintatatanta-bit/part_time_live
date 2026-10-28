@@ -2967,6 +2967,21 @@ function registerStaffByAdmin(data) {
 function sendToSlack(accountName, lineUserId, messageText) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 💡 スタッフマスタからLINE IDに一致するスタッフ名を探す
+    var staffSheet = ss.getSheetByName("スタッフマスタ");
+    var staffName = "未登録スタッフ（または一般ユーザー）";
+    if (staffSheet) {
+      var staffData = staffSheet.getDataRange().getValues();
+      for (var s = 1; s < staffData.length; s++) {
+        var registeredLineId = String(staffData[s][2] || "").trim(); // C列（3列目）がLINE ID
+        if (registeredLineId && registeredLineId === String(lineUserId).trim()) {
+          staffName = staffData[s][1] || "名前なし"; // B列（2列目）がスタッフ氏名
+          break;
+        }
+      }
+    }
+
     var sheet = ss.getSheetByName("アカウントマスタ");
     if (!sheet) return;
     
@@ -2984,8 +2999,10 @@ function sendToSlack(accountName, lineUserId, messageText) {
     // URLが未設定の場合は送信しない
     if (!slackWebhookUrl || slackWebhookUrl.indexOf("http") !== 0) return;
     
+    // 💡 通知メッセージにスタッフ名を含めるように変更
     var payload = {
       text: "📩 *【" + accountName + "】にメッセージが届きました*\n" +
+            "• *スタッフ名:* *" + staffName + "*\n" +
             "• *LINEユーザーID:* `" + lineUserId + "`\n" +
             "• *メッセージ:* " + messageText
     };
