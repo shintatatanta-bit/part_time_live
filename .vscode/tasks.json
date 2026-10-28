@@ -4,8 +4,7 @@
         {
             "label": "GAS & Git 一括デプロイ",
             "type": "shell",
-            "command": "clasp push; clasp deploy --deploymentId AKfycbxUVoQ7uHRhCZCBOr4IODO7pHaP4RdLWb8OloBrBqd43E_JV5xl3izr2xKlg262QM4YPw --description \"${input:commitMessage}\"; git add .; git commit -m \"${input:commitMessage}\"; git push",
-
+            "command": "clasp push; git add .; git commit -m \"${input:commitMessage}\"; git push",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -21,7 +20,7 @@
         {
             "id": "commitMessage",
             "type": "promptString",
-            "description": "今回の変更メモ（コミットメッセージ兼デプロイ説明）を入力してください："
+            "description": "今回の変更メモ（コミットメッセージ）を入力してください："
         }
     ]
 }
