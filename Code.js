@@ -1743,7 +1743,7 @@ function getAccountDetailsList() {
         var accName = row[0];
         // 💡 F列（6列目）の値を確実に取得するために、シートから直接セルを指定して取得する
         var slackUrlVal = sheet.getRange(i + 1, 6).getValue() || "";
-
+        
         accounts.push({
           name: accName,
           channelId: row[1] || "",
