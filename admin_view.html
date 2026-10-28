@@ -2548,6 +2548,26 @@ function loadAccountOptions() {
           if (selectManual) selectManual.innerHTML = html; // 手動登録側にアカウント一覧をセット
         }).getAccountList();
       }
+
+      function saveSlackUrlFromGui() {
+  var select = document.getElementById('targetAccountSelect');
+  var idx = select.value;
+  if (idx === "" || !cachedAccountDetails[idx]) {
+    alert("アカウントを選択してください。");
+    return;
+  }
+  var accName = cachedAccountDetails[idx].name;
+  var slackUrl = document.getElementById('accountSlackUrlInput').value.trim();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      showToast(res.message, res.success);
+      if (res.success) {
+        loadAccountQrOptions();
+      }
+    })
+    .saveAccountSlackUrl({ accountName: accName, slackUrl: slackUrl });
+}
     </script>
   </body>
 </html>
