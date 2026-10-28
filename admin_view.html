@@ -912,6 +912,9 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
             html += '<option value="' + idx + '">' + escapeHtml(acc.name) + '</option>';
           });
           select.innerHTML = html;
+          
+          select.value = "0"; // 👈 【追加】最初のアカウントを自動で選択状態にする
+          
           updateAccountQrGuide();
         }).getAccountDetailsList();
       }
