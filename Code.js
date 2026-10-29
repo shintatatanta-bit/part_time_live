@@ -6,21 +6,15 @@
  */
 function doPost(e) {
   try {
-    // 💡 追加：ここにログを挟むことで、そもそもdoPostが動いたかどうかを強制的に実行数に残す
-    Logger.log("=== doPostが呼び出されました ===");
-    Logger.log("受信データ: " + (e && e.postData ? e.postData.contents : "データなし"));
-
     var contents = JSON.parse(e.postData.contents);
     var events = contents.events;
-    var destination = contents.destination; 
-    
-    Logger.log("宛先ボットID (destination): " + destination);
+    var destination = contents.destination; // 宛先ボットのID
     
     var accessToken = getAccessTokenByDestination(destination);
+    // 💡 シートへのBot ID書き込みを即座に確定させてからアカウント名を取得する
+    SpreadsheetApp.flush(); 
     var accountName = getAccountNameByDestination(destination);
     
-    Logger.log("特定されたアカウント名: " + accountName + " / トークン有無: " + (accessToken ? "あり" : "なし"));
-
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
       
@@ -29,10 +23,10 @@ function doPost(e) {
         var lineUserId = event.source.userId;
         var replyToken = event.replyToken;
         
-        // 🚀 【追加】どのアカウントに届いたメッセージでも、すべてSlackに飛ばす！
-        //sendToSlack(accountName, lineUserId, userMessage);
+        // 1. まず通常通りSlackへメッセージ受信を通知
+        sendToSlack(accountName, lineUserId, userMessage);
         
-        // 既存の「登録」などのキーワード判定処理
+        // 2. 「登録」などのキーワード判定処理
         if (userMessage === "登録" || userMessage === "ID確認" || userMessage === "id") {
           saveLineIdLog(lineUserId);
           
@@ -41,22 +35,21 @@ function doPost(e) {
           
           var messages = [
             { type: "text", text: "お疲れ様です！スタッフ登録を行います。\n\n① まず以下のご自身の【LINE ID】をコピーしてください👇" },
-            { type: "text", text: "＝＝＝＝" },
             { type: "text", text: lineUserId },
-            { type: "text", text: "＝＝＝＝" },
-            { type: "text", text: "② 次に、以下のリンクから登録フォームを開き、コピーしたLINE IDを貼り付けてください。" },
-            { type: "text", text: "＝＝＝＝" },
-            { type: "text", text: "▼ スタッフ初回登録ページ" },
-            { type: "text", text: "＝＝＝＝" },
-            { type: "text", text: registerUrl }
+            { type: "text", text: "② 次に、以下のリンクから登録フォームを開き、コピーしたLINE IDを貼り付けてください。\n\n▼ スタッフ初回登録ページ\n" + registerUrl }
           ];
           
-          sendLineMultipleRepliesWithToken(replyToken, messages, accessToken);
+          // 💡 LINEへ返信を試み、その結果（成功かエラー理由か）を受け取る
+          var debugResult = sendLineMultipleRepliesWithToken(replyToken, messages, accessToken);
+          
+          // 🚀 【診断用】LINEの返信がどうなったかをSlackに報告させる！
+          sendToSlack(accountName, "【システム診断】", "LINE返信処理の結果:\n" + debugResult + "\n(取得トークン有無: " + (accessToken ? "あり" : "なし/空") + ")");
         }
       }
     }
   } catch (error) {
-    Logger.log("doPostエラー: " + error.message);
+    // 万が一途中でエラーが起きたら、そのエラー内容をSlackに飛ばす
+    sendToSlack("アカウントA", "【システムエラー】", "doPost内でエラー発生: " + error.message);
   }
   
   return ContentService.createTextOutput(JSON.stringify({status: "ok"}))
@@ -121,6 +114,7 @@ function getAccessTokenByDestination(destination) {
 }
 
 function sendLineMultipleRepliesWithToken(replyToken, messagesArray, accessToken) {
+  var logMsg = "";
   try {
     var url = "https://api.line.me/v2/bot/message/reply";
     var payload = JSON.stringify({
@@ -141,20 +135,19 @@ function sendLineMultipleRepliesWithToken(replyToken, messagesArray, accessToken
       });
       
       var code = res.getResponseCode();
-      var body = res.getContentText();
-      Logger.log("■ LINE返信テスト (①個別トークン) ステータス: " + code + " / レスポンス: " + body);
-      
+      var text = res.getContentText();
       if (code === 200) {
-        return; // 送信成功したら終了！
+        return "✅ ①メイン送信で成功 (200 OK)";
       }
+      logMsg += "❌ ①メイン送信失敗 [コード:" + code + " 理由:" + text + "] / ";
     } else {
-      Logger.log("■ 警告: 有効な accessToken が渡されなかったため、①の処理がスキップされました。");
+      logMsg += "⚠️ ①メインのトークンが空です / ";
     }
     
-    // ② フォールバック
+    // ② 万が一①で送信できなかった場合、アカウントマスタの全トークンを順番に試す
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName("アカウントマスタ");
-    if (!sheet) return;
+    if (!sheet) return logMsg + "アカウントマスタシートなし";
     
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
@@ -172,16 +165,16 @@ function sendLineMultipleRepliesWithToken(replyToken, messagesArray, accessToken
       });
       
       var fCode = resFallback.getResponseCode();
-      var fBody = resFallback.getContentText();
-      Logger.log("■ LINE返信テスト (②フォールバック行" + (i+1) + ") ステータス: " + fCode + " / レスポンス: " + fBody);
-      
+      var fText = resFallback.getContentText();
       if (fCode === 200) {
-        Logger.log("→ フォールバック成功！");
-        break;
+        return logMsg + "✅ ②フォールバック(" + data[i][0] + ")で送信成功！";
+      } else {
+        logMsg += "❌ ②(" + data[i][0] + ")失敗 [コード:" + fCode + " 理由:" + fText + "] ";
       }
     }
+    return logMsg;
   } catch (e) {
-    Logger.log("sendLineMultipleRepliesWithTokenエラー: " + e.message);
+    return "関数内例外エラー: " + e.message;
   }
 }
 
