@@ -112,10 +112,6 @@ function getAccessTokenByDestination(destination) {
   }
 }
 
-/**
- * 💡 指定したアクセストークンを使用して複数のメッセージを返信する関数
- * （もしトークンが未特定・不一致だった場合は、全アカウントのトークンを順番に試して確実に返信します）
- */
 function sendLineMultipleRepliesWithToken(replyToken, messagesArray, accessToken) {
   try {
     var url = "https://api.line.me/v2/bot/message/reply";
@@ -136,12 +132,18 @@ function sendLineMultipleRepliesWithToken(replyToken, messagesArray, accessToken
         muteHttpExceptions: true
       });
       
-      if (res.getResponseCode() === 200) {
+      var code = res.getResponseCode();
+      var body = res.getContentText();
+      Logger.log("■ LINE返信テスト (①個別トークン) ステータス: " + code + " / レスポンス: " + body);
+      
+      if (code === 200) {
         return; // 送信成功したら終了！
       }
+    } else {
+      Logger.log("■ 警告: 有効な accessToken が渡されなかったため、①の処理がスキップされました。");
     }
     
-    // ② 万が一①で送信できなかった場合（accessTokenが空など）、アカウントマスタの全トークンを順番に試す
+    // ② フォールバック
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName("アカウントマスタ");
     if (!sheet) return;
@@ -161,8 +163,12 @@ function sendLineMultipleRepliesWithToken(replyToken, messagesArray, accessToken
         muteHttpExceptions: true
       });
       
-      // ステータス200（成功）が返ってきたら、正しく返信できたのでループを抜ける
-      if (resFallback.getResponseCode() === 200) {
+      var fCode = resFallback.getResponseCode();
+      var fBody = resFallback.getContentText();
+      Logger.log("■ LINE返信テスト (②フォールバック行" + (i+1) + ") ステータス: " + fCode + " / レスポンス: " + fBody);
+      
+      if (fCode === 200) {
+        Logger.log("→ フォールバック成功！");
         break;
       }
     }
