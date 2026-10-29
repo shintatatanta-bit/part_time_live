@@ -6,13 +6,21 @@
  */
 function doPost(e) {
   try {
+    // 💡 追加：ここにログを挟むことで、そもそもdoPostが動いたかどうかを強制的に実行数に残す
+    Logger.log("=== doPostが呼び出されました ===");
+    Logger.log("受信データ: " + (e && e.postData ? e.postData.contents : "データなし"));
+
     var contents = JSON.parse(e.postData.contents);
     var events = contents.events;
-    var destination = contents.destination; // 宛先ボットのID
+    var destination = contents.destination; 
+    
+    Logger.log("宛先ボットID (destination): " + destination);
     
     var accessToken = getAccessTokenByDestination(destination);
-    var accountName = getAccountNameByDestination(destination); // 💡 アカウント名を特定
+    var accountName = getAccountNameByDestination(destination);
     
+    Logger.log("特定されたアカウント名: " + accountName + " / トークン有無: " + (accessToken ? "あり" : "なし"));
+
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
       
