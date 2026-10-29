@@ -30,7 +30,7 @@ function doPost(e) {
         var replyToken = event.replyToken;
         
         // 🚀 【追加】どのアカウントに届いたメッセージでも、すべてSlackに飛ばす！
-        sendToSlack(accountName, lineUserId, userMessage);
+        //sendToSlack(accountName, lineUserId, userMessage);
         
         // 既存の「登録」などのキーワード判定処理
         if (userMessage === "登録" || userMessage === "ID確認" || userMessage === "id") {
