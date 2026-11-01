@@ -3063,3 +3063,136 @@ function debugCheckSlackUrl() {
     Logger.log("行 " + (i + 1) + " | アカウント: " + accName + " | F列の値: [" + slackUrlVal + "]");
   }
 }
+
+/**
+ * 💡 シフト予定シートのE列（備考）からデータを集約し、
+ * カレンダーと備考一覧の2枚を同時にPDF化してGoogleドライブに保存する関数
+ */
+function exportCalendarAndRemarksPdf(yearMonth) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var folder = DriveApp.getRootFolder(); // 保存先（必要に応じてフォルダ変更可能）
+    
+    // 対象月の指定がない場合は当月とする
+    if (!yearMonth) {
+      var now = new Date();
+      yearMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    }
+    
+    // 1. 備考・伝達事項一覧シートを自動更新
+    updateRemarksSheet_(yearMonth);
+    
+    // 2. カレンダーシートのPDF出力（※「11月度」などのシート名や現在の年月名に合わせる）
+    var parts = yearMonth.split('-');
+    var calendarSheetName = parts[0] + "年 " + Number(parts[1]) + "月度"; 
+    var calendarSheet = ss.getSheetByName(calendarSheetName) || ss.getSheetByName(Number(parts[1]) + "月度") || ss.getSheets()[0];
+    
+    if (calendarSheet) {
+      exportSheetToPdf_(calendarSheet, yearMonth + "_シフトカレンダー", folder);
+    }
+    
+    // 3. 備考・伝達事項一覧シートのPDF出力
+    var remarksSheet = ss.getSheetByName("備考・伝達事項一覧");
+    if (remarksSheet) {
+      exportSheetToPdf_(remarksSheet, yearMonth + "_備考・伝達事項一覧", folder);
+    }
+    
+    return { success: true, message: "カレンダーと備考一覧の2枚のPDF出力が完了しました！" };
+  } catch (error) {
+    return { success: false, message: "PDF出力エラー: " + error.message };
+  }
+}
+
+/**
+ * 「シフト予定」シートのE列に値（備考）が入っている行を抽出し、「備考・伝達事項一覧」シートに書き出す内部関数
+ */
+function updateRemarksSheet_(yearMonth) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var shiftSheet = ss.getSheetByName("シフト予定");
+  var remarksSheet = ss.getSheetByName("備考・伝達事項一覧");
+  
+  if (!shiftSheet) return;
+  if (!remarksSheet) {
+    remarksSheet = ss.insertSheet("備考・伝達事項一覧");
+  }
+  
+  // 備考・伝達事項一覧をクリア
+  remarksSheet.clear();
+  
+  // 見出しの設定
+  remarksSheet.appendRow(["勤務日", "スタッフ名", "希望時間・備考"]);
+  remarksSheet.getRange("A1:C1").setFontWeight("bold").setBackground("#f1f5f9");
+  
+  var lastRow = shiftSheet.getLastRow();
+  if (lastRow < 2) return;
+  
+  var data = shiftSheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  var outputData = [];
+  
+  for (var i = 0; i < data.length; i++) {
+    var rawDate = data[i][1];     // 勤務日（B列）
+    var staffName = data[i][3]; // スタッフ名（D列）
+    var remark = data[i][4];    // 希望時間・備考（E列）
+    
+    if (!rawDate || !remark) continue;
+    
+    // 日付の文字列変換
+    var dateStr = "";
+    if (rawDate instanceof Date) {
+      dateStr = Utilities.formatDate(rawDate, "Asia/Tokyo", "yyyy-MM-dd");
+    } else {
+      dateStr = String(rawDate).substring(0, 10);
+    }
+    
+    // 指定された年月のデータのみ抽出
+    if (yearMonth && dateStr.indexOf(yearMonth) !== 0) continue;
+    
+    // カラーコードなどの装飾文字を除去して綺麗なテキストにする
+    var cleanRemark = String(remark).replace("||color:yellow", "").replace("||color:blue", "").trim();
+    if (cleanRemark !== "") {
+      outputData.push([dateStr, staffName, cleanRemark]);
+    }
+  }
+  
+  if (outputData.length > 0) {
+    remarksSheet.getRange(2, 1, outputData.length, 3).setValues(outputData);
+    remarksSheet.autoResizeColumns(1, 3);
+  }
+}
+
+/**
+ * 指定したシートをA4縦でPDF化して保存する共通関数（内部用）
+ */
+function exportSheetToPdf_(sheet, fileName, folder) {
+  var spreadsheetId = sheet.getParent().getId();
+  var sheetId = sheet.getSheetId();
+  
+  var url = "https://docs.google.com/spreadsheets/d/" + spreadsheetId + "/export?";
+  var options = {
+    exportFormat: "pdf",
+    format: "pdf",
+    size: "A4",           // 用紙サイズ A4
+    portrait: "true",     // 縦向き
+    fitw: "true",         // 幅をページに合わせる
+    gridlines: "true",    // グリッド線表示
+    printtitle: "false",
+    sheetnames: "false",
+    gid: sheetId
+  };
+  
+  var urlParts = [];
+  for (var key in options) {
+    urlParts.push(key + "=" + options[key]);
+  }
+  var exportUrl = url + urlParts.join("&");
+  
+  var response = UrlFetchApp.fetch(exportUrl, {
+    headers: {
+      "Authorization": "Bearer " + ScriptApp.getOAuthToken(),
+      "MuteHttpExceptions": true
+    }
+  });
+  
+  var blob = response.getBlob().setName(fileName + ".pdf");
+  folder.createFile(blob);
+}

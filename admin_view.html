@@ -1043,6 +1043,48 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         var titleText = parts[0] + '年 ' + Number(parts[1]) + '月度 アルバイト勤務シフト予定表';
         
         var gridHtml = document.getElementById('calendarGrid').outerHTML;
+        
+        // 💡 伝達事項があるシフトを抽出してリスト化
+        var memosWithDate = [];
+        cachedShiftsData.forEach(function(sh) {
+          if (sh.dailyMemo && sh.dailyMemo.trim() !== "") {
+            var cleanMemo = sh.dailyMemo.replace('||color:yellow', '').replace('||color:blue', '').trim();
+            if (cleanMemo) {
+              memosWithDate.push({
+                workDate: sh.workDate,
+                staffName: sh.staffName,
+                memo: cleanMemo
+              });
+            }
+          }
+        });
+
+        // 日付順に並び替え
+        memosWithDate.sort(function(a, b) {
+          return new Date(a.workDate) - new Date(b.workDate);
+        });
+
+        // 💡 2枚目（2ページ目）用の伝達事項一覧HTMLを構築
+        var remarksHtml = '';
+        if (memosWithDate.length > 0) {
+          remarksHtml += '<div style="page-break-before: always; padding-top: 20px;">';
+          remarksHtml += '<h3 style="font-size: 1.2rem; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 15px; text-align: center;">📝 ' + Number(parts[1]) + '月度 スタッフ伝達事項・希望時間一覧</h3>';
+          remarksHtml += '<table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">';
+          remarksHtml += '<thead><tr style="background: #f1f5f9;"><th style="border: 1px solid #cbd5e1; padding: 8px; width: 120px; text-align: center;">勤務日</th><th style="border: 1px solid #cbd5e1; padding: 8px; width: 180px;">スタッフ名</th><th style="border: 1px solid #cbd5e1; padding: 8px;">希望時間・備考</th></tr></thead>';
+          remarksHtml += '<tbody>';
+          memosWithDate.forEach(function(item) {
+            var p = item.workDate.split('-');
+            var dateDisplay = Number(p[1]) + '/' + Number(p[2]);
+            remarksHtml += '<tr>';
+            remarksHtml += '<td style="border: 1px solid #cbd5e1; padding: 8px; font-weight: bold; text-align: center;">' + dateDisplay + '</td>';
+            remarksHtml += '<td style="border: 1px solid #cbd5e1; padding: 8px; font-weight: bold;">' + escapeHtml(item.staffName) + '</td>';
+            remarksHtml += '<td style="border: 1px solid #cbd5e1; padding: 8px;">' + escapeHtml(item.memo) + '</td>';
+            remarksHtml += '</tr>';
+          });
+          remarksHtml += '</tbody></table>';
+          remarksHtml += '</div>';
+        }
+
         var printWin = window.open('', '_blank', 'width=1100,height=800');
         
         var cellMinHeight = '125px';
@@ -1053,13 +1095,10 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         printDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + titleText + '</title>');
         printDoc.write('<style>');
         printDoc.write('@page { size: A4 landscape; margin: 10mm; }');
-        
-        // 💡 【この1行を追加してください】背景色（丸バッジの緑や黄色、日曜の赤字）を強制的にカラー出力する設定
         printDoc.write('* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }');
-
-        printDoc.write('body { font-family: sans-serif; margin: 0; padding: 5px; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100vh; box-sizing: border-box; }');
+        printDoc.write('body { font-family: sans-serif; margin: 0; padding: 5px; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; }');
         printDoc.write('h2 { text-align: center; margin: 0 0 10px 0; font-size: 1.4rem; }');
-        printDoc.write('.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: 100%; max-width: 100%; flex-grow: 1; }');
+        printDoc.write('.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: 100%; max-width: 100%; }');
         printDoc.write('.cal-header-cell { text-align: center; font-weight: bold; font-size: 0.9rem; padding: 6px 4px; background: #f1f5f9; border-radius: 4px; }');
         printDoc.write('.cal-header-cell:nth-child(1) { color: #e11d48; }');
         printDoc.write('.cal-header-cell:nth-child(7) { color: #2563eb; }');
@@ -1069,20 +1108,21 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         printDoc.write('.cal-date-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }');
         printDoc.write('.cal-date-num { font-size: ' + fontSizeNum + '; font-weight: bold; color: #475569; }');
         printDoc.write('.cal-date-num.sun-or-hol { color: #e11d48; }');
-        
-        // 💡 シフトチップの配置と色をしっかり調整
         printDoc.write('.cal-section-shift { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; position: relative; }');
         printDoc.write('.staff-circle-badge { color: white !important; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10pt !important; font-weight: bold; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }');
-        
-        // 💡 伝達事項マーク（❗）の位置をバッジの左上に固定
         printDoc.write('.memo-badge-icon { position: absolute; top: -6px; left: -6px; font-size: 8pt !important; background: #f59e0b; color: white; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; z-index: 10; }');
-        
         printDoc.write('.free-badge { background: #d97706 !important; color: white !important; font-size: 7pt !important; padding: 2px 4px; border-radius: 3px; display: inline-flex; align-items: center; }');
         printDoc.write('.del-x { display: none; }');
         printDoc.write('</style>');
         printDoc.write('</head><body>');
         printDoc.write('<h2>' + titleText + '</h2>');
         printDoc.write(gridHtml);
+        
+        // 💡 伝達事項がある場合のみ、2ページ目（2枚目）としてテーブルを出力
+        if (remarksHtml) {
+          printDoc.write(remarksHtml);
+        }
+
         printDoc.write('</body></html>');
         printDoc.close();
         printWin.focus();
@@ -1181,6 +1221,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
       }
 
       function onCellClick(dateStr) {
+        // 💡 修正: スタッフまたはフリー予定のチップが選択されている場合は、その日付に配置する処理を優先する
         if (selectedStaffForClick) {
           if (selectedStaffForClick.type === 'free') {
             var tempId = "local_free_" + Math.random();
@@ -1190,12 +1231,13 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
             selectedStaffForClick = null;
             document.querySelectorAll('.staff-chip').forEach(function(c) { c.classList.remove('selected-active'); });
           } else if (selectedStaffForClick.type === 'staff') {
-            // 💡 選択されたスタッフ情報を元にモーダルを開く
+            // 選択されたスタッフの配置モーダルを開く
             openModal(dateStr, selectedStaffForClick.staffId, selectedStaffForClick.staffName, selectedStaffForClick.displayChar);
             selectedStaffForClick = null;
             document.querySelectorAll('.staff-chip').forEach(function(c) { c.classList.remove('selected-active'); });
           }
         } else {
+          // チップが選択されていない通常のタップ時は、これまで通り「休業日」を切り替える
           var index = cachedClosedDays.indexOf(dateStr);
           if (index !== -1) { cachedClosedDays.splice(index, 1); } 
           else { cachedClosedDays.push(dateStr); }
