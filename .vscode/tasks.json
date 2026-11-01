@@ -1,0 +1,26 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "GAS & Git 一括デプロイ",
+            "type": "shell",
+            "command": "clasp push; clasp deploy --deploymentId AKfycbylRfwK7z5bYaODeJD2iAcQ_Bc9f6i1tnTaiUvHK-SSSsMx_RfJ2q413UYTO0E97b0Bow; git add .; git commit -m \"${input:commitMessage}\"; git push",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "commitMessage",
+            "type": "promptString",
+            "description": "今回の変更メモ（コミットメッセージ）を入力してください："
+        }
+    ]
+}
