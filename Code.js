@@ -3479,3 +3479,15 @@ function deleteKintaiData(data) {
     return { success: false, message: "削除エラー: " + error.message };
   }
 }
+
+/**
+ * 💡 カレンダー上のスタッフ並び順（およびシフト予定）を保存する関数
+ */
+function saveShiftOrderAndSchedules(data) {
+  try {
+    // 既存のシフト一括保存関数を利用しつつ、順番通りに配列を保存します
+    return saveAllSchedulesWithFree(data);
+  } catch (error) {
+    return { success: false, message: "順序保存エラー: " + error.message };
+  }
+}

@@ -375,6 +375,22 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
           width: 100%;
         }
       }
+
+      .staff-badge {
+  cursor: grab;
+  user-select: none;
+  transition: opacity 0.2s;
+}
+.staff-badge:active {
+  cursor: grabbing;
+}
+.staff-badge.dragging {
+  opacity: 0.4;
+}
+.cal-cell.drag-over {
+  background-color: #e0f2fe !important;
+  border: 2px dashed #0284c7 !important;
+}
       
     </style>
   </head>
@@ -1170,38 +1186,34 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         markAsUnsaved();
       }
 
-      function onDrop(event, dateStr) {
+  function onDrop(event, dateStr) {
         event.preventDefault();
         document.querySelectorAll('.cal-cell, .list-row').forEach(function(el) { el.classList.remove('drag-over'); });
         
         var dataStr = event.dataTransfer.getData('text/plain');
-        console.log("🔍 [検証] onDrop開始 - 取得したデータ:", dataStr);
-        
-        if (!dataStr) {
-          console.log("❌ [検証] データが空です");
-          return;
-        }
+        if (!dataStr) return;
         
         try {
           var data = JSON.parse(dataStr);
-          console.log("🔍 [検証] パース成功:", data);
           
           if (data.type === 'free') {
-            console.log("📌 [検証] freeタイプとして処理します");
+            // フリー予定の配置
             var tempId = "local_free_" + Math.random();
             cachedFreeSchedules.push({ scheduleId: tempId, workDate: dateStr, title: data.title });
             renderCurrentView();
             markAsUnsaved();
           } else if (data.type === 'staff') {
-            console.log("👤 [検証] staffタイプを検出。openModalを呼び出します。 staffId:", data.staffId);
+            // パレットからの新規スタッフ配置
             openModal(dateStr, data.staffId, data.staffName, data.displayChar);
-          } else {
-            console.log("⚠️ [検証] どの条件にも一致しませんでした type:", data.type);
           }
+          // 💡 ※ここにあった「既存スタッフのシフト移動（別の日への日付変更）」の処理を削除しました
         } catch (e) {
-          console.error("❌ [検証] ドロップデータ解析エラー:", e.message);
+          console.error("ドロップデータ解析エラー:", e.message);
         }
       }
+
+      var draggedShiftId = null;
+      var draggedSourceDate = null;
 
       function onCellClick(dateStr) {
         // 💡 修正: スタッフまたはフリー予定のチップが選択されている場合は、その日付に配置する処理を優先する
@@ -1465,7 +1477,13 @@ var badgeMainColor = isYellow ? '#ca8a04' : '#059669';
 var memoIcon = displayMemoText ? '<span class="memo-badge-icon" style="background: #f59e0b;" title="伝達事項: ' + escapeHtml(displayMemoText) + '">❗</span>' : '';
 
 // 💡 style="background: [色];" をバッジ本体に付与する
-html += '<div class="staff-circle-badge" style="background: ' + badgeMainColor + ';" onclick="event.stopPropagation(); openMemoModal(\'' + sh.shiftId + '\', \'' + escapeHtml(sh.staffName) + '\', \'' + sh.workDate + '\', \'' + escapeHtml(sh.dailyMemo || '') + '\')" title="' + tooltipText + '">';
+html += '<div class="staff-circle-badge" draggable="true" ' +
+        'ondragstart="onStaffBadgeDragStart(event, \'' + sh.shiftId + '\', \'' + sh.workDate + '\')" ' +
+        'ondragover="event.preventDefault()" ' +
+        'ondrop="onStaffBadgeDrop(event, \'' + sh.shiftId + '\', \'' + sh.workDate + '\')" ' +
+        'style="background: ' + badgeMainColor + ';" ' +
+        'onclick="event.stopPropagation(); openMemoModal(\'' + sh.shiftId + '\', \'' + escapeHtml(sh.staffName) + '\', \'' + sh.workDate + '\', \'' + escapeHtml(sh.dailyMemo || '') + '\')" ' +
+        'title="' + tooltipText + '">';
 html += memoIcon + '<span>' + escapeHtml(dispChar) + '</span>';
 html += '<span class="del-x" onclick="removeShiftById(\'' + sh.shiftId + '\')">×</span>';
 html += '</div>';
@@ -2114,15 +2132,9 @@ html += '</div>';
       }
 
       function sortShiftsByStaffOrder(shifts) {
-        if (!shifts) return [];
-        return shifts.sort(function(a, b) {
-          var indexA = cachedStaffList.findIndex(function(st) { return st.staffId === a.staffId; });
-          var indexB = cachedStaffList.findIndex(function(st) { return st.staffId === b.staffId; });
-          if (indexA === -1) indexA = 999;
-          if (indexB === -1) indexB = 999;
-          return indexA - indexB;
-        });
-      }
+  // ユーザーが並び替えた順番（配列の順序）をそのまま維持する
+  return shifts || [];
+}
 
       function openModal(dateStr, staffId, staffName, displayChar) {
         console.log("📂 [検証] openModal実行開始！ 引数:", { dateStr, staffId, staffName, displayChar });
@@ -2793,6 +2805,124 @@ function saveShiftMemoFromModal() {
             alert('通信エラー: ' + err.message);
           })
           .generateA3CalendarPdf(ym);
+      }
+
+      // スタッフバッジを生成する部分のコード例
+function createStaffBadgeElement(sh, dateStr) {
+  var badge = document.createElement('span');
+  badge.className = 'staff-badge';
+  badge.draggable = true;
+  badge.innerText = sh.staffName; // または表示文字
+  
+  // 💡 ドラッグ開始時のイベント
+  badge.addEventListener('dragstart', function(e) {
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      staffId: sh.staffId,
+      staffName: sh.staffName,
+      sourceDate: dateStr
+    }));
+    badge.classList.add('dragging');
+  });
+
+  badge.addEventListener('dragend', function(e) {
+    badge.classList.remove('dragging');
+  });
+
+  return badge;
+}
+
+// カレンダーの各日付セル（td）へのドロップイベント設定例
+function setupCellDropTarget(cellEl, dateStr) {
+  cellEl.addEventListener('dragover', function(e) {
+    e.preventDefault(); // ドロップを許可するために必須
+    cellEl.classList.add('drag-over');
+  });
+
+  cellEl.addEventListener('dragleave', function(e) {
+    cellEl.classList.remove('drag-over');
+  });
+
+  cellEl.addEventListener('drop', function(e) {
+    e.preventDefault();
+    cellEl.classList.remove('drag-over');
+
+    var rawData = e.dataTransfer.getData('text/plain');
+    if (!rawData) return;
+    
+    var dragData = JSON.parse(rawData);
+    var sourceDate = dragData.sourceDate;
+    var targetDate = dateStr;
+    var staffId = dragData.staffId;
+
+    // メモリ上のシフトデータ構造を更新する処理
+    moveOrReorderStaffShift(staffId, sourceDate, targetDate);
+    
+    // カレンダーの見た目を再描画
+    renderCalendarGrid(); 
+  });
+}
+
+var draggedShiftId = null;
+var draggedSourceDate = null;
+
+// ① スタッフバッジのドラッグ開始
+      function onStaffBadgeDragStart(event, shiftId, workDate) {
+        event.stopPropagation(); // セル全体のドラッグと競合しないようにする
+        draggedShiftId = shiftId;
+        draggedSourceDate = workDate;
+        event.dataTransfer.setData('text/plain', JSON.stringify({ 
+          type: 'shift_move', 
+          shiftId: shiftId, 
+          workDate: workDate 
+        }));
+      }
+
+      // 💡 バッジの左右どちらに落とされたかを判定して、前後に挿入できるように改良した関数
+      function onStaffBadgeDrop(event, targetShiftId, targetWorkDate) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var dataStr = event.dataTransfer.getData('text/plain');
+        if (!dataStr) return;
+
+        try {
+          var data = JSON.parse(dataStr);
+          var shiftId = data.shiftId;
+          if (!shiftId) return;
+
+          var draggedIndex = cachedShiftsData.findIndex(function(s) { return s.shiftId === shiftId; });
+          if (draggedIndex === -1) return;
+          var draggedShift = cachedShiftsData[draggedIndex];
+
+          // 日付を移動先に更新
+          draggedShift.workDate = targetWorkDate;
+
+          var targetIndex = cachedShiftsData.findIndex(function(s) { return s.shiftId === targetShiftId; });
+          if (targetIndex !== -1 && draggedIndex !== targetIndex) {
+            // 💡 ターゲットバッジの幅に対するマウスのドロップ位置（左右）を計算
+            var rect = event.currentTarget.getBoundingClientRect();
+            var offsetX = event.clientX - rect.left;
+            var isRightSide = offsetX > (rect.width / 2); // 右半分かどうか
+
+            cachedShiftsData.splice(draggedIndex, 1);
+            var newTargetIndex = cachedShiftsData.findIndex(function(s) { return s.shiftId === targetShiftId; });
+            
+            // 右半分ならターゲットの「次（後ろ）」、左半分なら「前」に挿入
+            if (isRightSide) {
+              cachedShiftsData.splice(newTargetIndex + 1, 0, draggedShift);
+            } else {
+              cachedShiftsData.splice(newTargetIndex, 0, draggedShift);
+            }
+          } else {
+            cachedShiftsData.splice(draggedIndex, 1);
+            cachedShiftsData.push(draggedShift);
+          }
+
+          renderCurrentView();
+          markAsUnsaved();
+        } catch (e) {
+          console.error("バッジドロップエラー:", e.message);
+        }
       }
 
     </script>
