@@ -447,9 +447,10 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
             </div>
           </div>
           <div class="calendar-controls-right">
-            <button class="secondary" style="background: #0f172a; color: #fff; border: none;" onclick="copySlackShiftText()">📋 Slack用シフトコピー</button>
-            <button class="secondary" onclick="openPrintPreview('A4')">🖨️ A4横 印刷</button>
-          </div>
+  <button class="secondary" style="background: #0f172a; color: #fff; border: none;" onclick="copySlackShiftText()">📋 Slack用シフトコピー</button>
+  <button class="secondary" style="background: #0f172a; color: #fff; border: none;" onclick="openPrintPreview()">🖨️ A4横 印刷</button>
+  <button class="secondary" style="background: #0f172a; color: #fff; border: none;" onclick="downloadA3Pdf()">📥 A3横 PDFダウンロード</button>
+</div>
         </div>
 
         <div class="card" style="border: 1px dashed var(--border-color); background: #f8fafc; margin-bottom: 16px; padding: 14px;">
@@ -1036,6 +1037,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         }
       }
 
+      // 1. これまでの「A4横 1枚カレンダー印刷」
       function openPrintPreview() {
         var ym = document.getElementById('calendarMonth').value;
         if (!ym) { alert('対象月を選択してください。'); return; }
@@ -1044,27 +1046,17 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         
         var gridHtml = document.getElementById('calendarGrid').outerHTML;
         
-        // 💡 伝達事項があるシフトを抽出してリスト化
         var memosWithDate = [];
         cachedShiftsData.forEach(function(sh) {
           if (sh.dailyMemo && sh.dailyMemo.trim() !== "") {
             var cleanMemo = sh.dailyMemo.replace('||color:yellow', '').replace('||color:blue', '').trim();
             if (cleanMemo) {
-              memosWithDate.push({
-                workDate: sh.workDate,
-                staffName: sh.staffName,
-                memo: cleanMemo
-              });
+              memosWithDate.push({ workDate: sh.workDate, staffName: sh.staffName, memo: cleanMemo });
             }
           }
         });
+        memosWithDate.sort(function(a, b) { return new Date(a.workDate) - new Date(b.workDate); });
 
-        // 日付順に並び替え
-        memosWithDate.sort(function(a, b) {
-          return new Date(a.workDate) - new Date(b.workDate);
-        });
-
-        // 💡 2枚目（2ページ目）用の伝達事項一覧HTMLを構築
         var remarksHtml = '';
         if (memosWithDate.length > 0) {
           remarksHtml += '<div style="page-break-before: always; padding-top: 20px;">';
@@ -1086,10 +1078,6 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         }
 
         var printWin = window.open('', '_blank', 'width=1100,height=800');
-        
-        var cellMinHeight = '125px';
-        var fontSizeNum = '0.9rem';
-
         var printDoc = printWin.document;
         printDoc.open();
         printDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + titleText + '</title>');
@@ -1102,11 +1090,11 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         printDoc.write('.cal-header-cell { text-align: center; font-weight: bold; font-size: 0.9rem; padding: 6px 4px; background: #f1f5f9; border-radius: 4px; }');
         printDoc.write('.cal-header-cell:nth-child(1) { color: #e11d48; }');
         printDoc.write('.cal-header-cell:nth-child(7) { color: #2563eb; }');
-        printDoc.write('.cal-cell { min-height: ' + cellMinHeight + '; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; box-sizing: border-box; position: relative; }');
+        printDoc.write('.cal-cell { min-height: 125px; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; box-sizing: border-box; position: relative; }');
         printDoc.write('.cal-cell.other-month { background: #f8fafc; opacity: 0.3; }');
         printDoc.write('.cal-cell.closed-day { background: #f1f5f9 !important; border: 1px dashed #cbd5e1 !important; }');
         printDoc.write('.cal-date-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }');
-        printDoc.write('.cal-date-num { font-size: ' + fontSizeNum + '; font-weight: bold; color: #475569; }');
+        printDoc.write('.cal-date-num { font-size: 0.9rem; font-weight: bold; color: #475569; }');
         printDoc.write('.cal-date-num.sun-or-hol { color: #e11d48; }');
         printDoc.write('.cal-section-shift { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; position: relative; }');
         printDoc.write('.staff-circle-badge { color: white !important; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10pt !important; font-weight: bold; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }');
@@ -1117,12 +1105,7 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         printDoc.write('</head><body>');
         printDoc.write('<h2>' + titleText + '</h2>');
         printDoc.write(gridHtml);
-        
-        // 💡 伝達事項がある場合のみ、2ページ目（2枚目）としてテーブルを出力
-        if (remarksHtml) {
-          printDoc.write(remarksHtml);
-        }
-
+        if (remarksHtml) { printDoc.write(remarksHtml); }
         printDoc.write('</body></html>');
         printDoc.close();
         printWin.focus();
@@ -2775,6 +2758,42 @@ function saveShiftMemoFromModal() {
   closeMemoModal();
   showToast('メモを一時保存しました。「変更内容を保存する」を押して確定させてください。', true);
 }
+
+// 💡 GAS側で生成した「A4縦2ページ（見開きA3）PDF」を受け取ってダウンロードする関数
+      function downloadA3Pdf() {
+        var ym = document.getElementById('calendarMonth').value;
+        if (!ym) { alert('対象月を選択してください。'); return; }
+        
+        showToast('A4縦2枚（見開きA3）のPDFを生成中です...', true);
+        
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.success) {
+              var byteCharacters = atob(res.base64);
+              var byteNumbers = new Array(byteCharacters.length);
+              for (var i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              var byteArray = new Uint8Array(byteNumbers);
+              var blob = new Blob([byteArray], { type: res.mimeType });
+              
+              var link = document.createElement('a');
+              link.href = window.URL.createObjectURL(blob);
+              link.download = res.fileName;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              showToast('PDFのダウンロードが完了しました！', true);
+            } else {
+              alert('PDF生成失敗: ' + res.message);
+            }
+          })
+          .withFailureHandler(function(err) {
+            alert('通信エラー: ' + err.message);
+          })
+          .generateA3CalendarPdf(ym);
+      }
 
     </script>
   </body>

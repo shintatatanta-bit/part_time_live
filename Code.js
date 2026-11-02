@@ -3196,3 +3196,252 @@ function exportSheetToPdf_(sheet, fileName, folder) {
   var blob = response.getBlob().setName(fileName + ".pdf");
   folder.createFile(blob);
 }
+
+/**
+ * 💡 A4縦2ページ（横に並べるとA3の格子カレンダー＋下部伝達事項）のPDFを直接生成する関数
+ * 伝達事項の [!] マークをスタッフ名のすぐ後ろに配置して分かりやすくした版
+ */
+function generateA3CalendarPdf(yearMonth) {
+  try {
+    if (!yearMonth) {
+      var now = new Date();
+      yearMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    }
+    var parts = yearMonth.split('-');
+    var year = Number(parts[0]);
+    var month = Number(parts[1]);
+    var titleText = year + '年 ' + month + '月度 アルバイト勤務シフト予定表';
+
+    // データの取得
+    var staffList = getStaffList();
+    var shiftRes = getShiftSchedule(yearMonth);
+    var shifts = shiftRes.success ? shiftRes.shifts : [];
+    var holRes = getJapaneseHolidays(yearMonth);
+    var holidaysMap = holRes.success ? holRes.holidays : {};
+    var closedRes = getClosedDays(yearMonth);
+    var closedDays = closedRes.success ? closedRes.closedDays : [];
+    var freeRes = getFreeSchedules(yearMonth);
+    var freeSchedules = freeRes.success ? freeRes.freeSchedules : [];
+
+    var staffCharMap = {};
+    var staffOrderMap = {};
+    staffList.forEach(function(st, idx) {
+      staffCharMap[st.staffId] = st.displayChar || st.staffName.substring(0, 1);
+      staffOrderMap[st.staffId] = idx;
+    });
+
+    var shiftMap = {};
+    var memosWithDate = [];
+    shifts.forEach(function(s) {
+      if (!shiftMap[s.workDate]) shiftMap[s.workDate] = [];
+      shiftMap[s.workDate].push(s);
+
+      if (s.dailyMemo && String(s.dailyMemo).trim() !== "") {
+        var cleanMemo = String(s.dailyMemo).replace('||color:yellow', '').replace('||color:blue', '').trim();
+        if (cleanMemo) {
+          memosWithDate.push({
+            workDate: s.workDate,
+            staffName: s.staffName,
+            memo: cleanMemo
+          });
+        }
+      }
+    });
+
+    memosWithDate.sort(function(a, b) {
+      return new Date(a.workDate) - new Date(b.workDate);
+    });
+
+    var freeMap = {};
+    freeSchedules.forEach(function(f) {
+      if (!freeMap[f.workDate]) freeMap[f.workDate] = [];
+      freeMap[f.workDate].push(f);
+    });
+
+    function esc(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>'"]/g, function(tag) {
+        var chars = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+        return chars[tag] || tag;
+      });
+    }
+
+    var firstDayObj = new Date(year, month - 1, 1);
+    var lastDayObj = new Date(year, month, 0);
+    var firstDayOfWeek = firstDayObj.getDay();
+    var totalDays = lastDayObj.getDate();
+    var prevLastDay = new Date(year, month - 1, 0).getDate();
+
+    var allCells = [];
+    for (var i = 0; i < firstDayOfWeek; i++) {
+      var pDay = prevLastDay - (firstDayOfWeek - 1 - i);
+      allCells.push({ isOther: true, day: pDay });
+    }
+    for (var day = 1; day <= totalDays; day++) {
+      var mStr = String(month).padStart(2, '0');
+      var dStr = String(day).padStart(2, '0');
+      var dateStr = year + '-' + mStr + '-' + dStr;
+      var dObj = new Date(year, month - 1, day);
+      allCells.push({
+        isOther: false,
+        day: day,
+        dateStr: dateStr,
+        wDay: dObj.getDay(),
+        holidayName: holidaysMap[dateStr] || '',
+        isClosed: closedDays.indexOf(dateStr) !== -1
+      });
+    }
+    var rem = (allCells.length % 7 === 0) ? 0 : 7 - (allCells.length % 7);
+    for (var n = 1; n <= rem; n++) {
+      allCells.push({ isOther: true, day: n });
+    }
+
+    var weeks = [];
+    for (var wIdx = 0; wIdx < allCells.length; wIdx += 7) {
+      weeks.push(allCells.slice(wIdx, wIdx + 7));
+    }
+
+    var weekDaysAll = ["日", "月", "火", "水", "木", "金", "土"];
+    function buildCalendarTableHtml(startCol, endCol) {
+      var tHtml = '<table class="cal-table"><thead><tr>';
+      for (var c = startCol; c <= endCol; c++) {
+        var thColor = (c === 0) ? '#e11d48' : (c === 6 ? '#2563eb' : '#334155');
+        tHtml += '<th style="color:' + thColor + ';">' + weekDaysAll[c] + '</th>';
+      }
+      tHtml += '</tr></thead><tbody>';
+
+      weeks.forEach(function(weekRow) {
+        tHtml += '<tr>';
+        for (var c = startCol; c <= endCol; c++) {
+          var cell = weekRow[c];
+          if (cell.isOther) {
+            tHtml += '<td style="background:#f8fafc; color:#cbd5e1;"><div style="font-size:9.5pt;">' + cell.day + '</div></td>';
+          } else {
+            var isSunOrHol = (cell.wDay === 0) || (cell.holidayName !== '');
+            var dateColor = isSunOrHol ? '#e11d48' : (cell.wDay === 6 ? '#2563eb' : '#0f172a');
+            var tdBg = cell.isClosed ? '#f1f5f9' : '#ffffff';
+
+            tHtml += '<td style="background:' + tdBg + ';">';
+            tHtml += '<div style="margin-bottom:3px;">';
+            tHtml += '<span style="font-size:10.5pt; font-weight:bold; color:' + dateColor + ';">' + cell.day + '</span>';
+            if (cell.holidayName) {
+              tHtml += ' <span style="font-size:7pt; color:#e11d48; font-weight:bold;">' + esc(cell.holidayName) + '</span>';
+            }
+            if (cell.isClosed) {
+              tHtml += ' <span style="font-size:7pt; background:#cbd5e1; color:#334155; padding:1px 3px;">休</span>';
+            }
+            tHtml += '</div>';
+
+            if (shiftMap[cell.dateStr]) {
+              var dayShifts = shiftMap[cell.dateStr].sort(function(a, b) {
+                var oa = (staffOrderMap[a.staffId] !== undefined) ? staffOrderMap[a.staffId] : 999;
+                var ob = (staffOrderMap[b.staffId] !== undefined) ? staffOrderMap[b.staffId] : 999;
+                return oa - ob;
+              });
+              tHtml += '<div style="margin-top:2px; line-height: 1.5;">';
+              dayShifts.forEach(function(sh) {
+                var dispChar = staffCharMap[sh.staffId] || sh.staffName.substring(0, 1);
+                var rawMemo = String(sh.dailyMemo || '');
+                var isYellow = rawMemo.indexOf('||color:yellow') !== -1;
+                var cleanM = rawMemo.replace('||color:yellow', '').replace('||color:blue', '').trim();
+                
+                var textColor = isYellow ? '#b45309' : '#047857'; 
+                // 💡 [!] マークをスタッフ名の【後ろ】にくっつけて表示する
+                var memoIndicator = cleanM ? '<span style="color:#d97706; font-size:8pt; font-weight:bold; margin-left:2px;">[!]</span>' : '';
+                
+                tHtml += '<span style="color: ' + textColor + '; margin-right: 8px; display: inline-block; font-weight: bold; font-size: 9.5pt;">' + esc(dispChar) + memoIndicator + '</span>';
+              });
+              tHtml += '</div>';
+            }
+
+            if (freeMap[cell.dateStr]) {
+              tHtml += '<div style="margin-top:2px;">';
+              freeMap[cell.dateStr].forEach(function(fs) {
+                tHtml += '<span class="free-item">' + esc(fs.title) + '</span>';
+              });
+              tHtml += '</div>';
+            }
+            tHtml += '</td>';
+          }
+        }
+        tHtml += '</tr>';
+      });
+
+      tHtml += '</tbody></table>';
+      return tHtml;
+    }
+
+    var halfIndex = Math.ceil(memosWithDate.length / 2);
+    var leftMemos = memosWithDate.slice(0, halfIndex);
+    var rightMemos = memosWithDate.slice(halfIndex);
+
+    function buildMemosBoxHtml(memoList, subLabel) {
+      if (memosWithDate.length === 0) return '';
+      var mHtml = '<div style="margin-top:12px; border:1px solid #f59e0b; background-color:#fffbeb; padding:8px;">';
+      mHtml += '<div style="font-weight:bold; font-size:9.5pt; color:#b45309; margin-bottom:4px; border-bottom:1px solid #fde68a; padding-bottom:3px;">📝 スタッフ伝達事項・希望時間一覧 ' + subLabel + '</div>';
+      if (memoList.length === 0) {
+        mHtml += '<div style="font-size:8.5pt; color:#64748b; padding:4px;">（続きはありません）</div>';
+      } else {
+        mHtml += '<table style="width:100%; border-collapse:collapse;"><tr>';
+        for (var i = 0; i < memoList.length; i++) {
+          if (i > 0 && i % 2 === 0) mHtml += '</tr><tr>';
+          var item = memoList[i];
+          var p = item.workDate.split('-');
+          var dateDisp = Number(p[1]) + '/' + Number(p[2]);
+          mHtml += '<td style="width:50%; padding:3px 6px; border-bottom:1px dashed #fde68a; font-size:8.5pt; vertical-align:top;">';
+          mHtml += '<strong style="color:#2563eb;">' + dateDisp + '</strong> ';
+          mHtml += '<strong style="color:#0f172a;">' + esc(item.staffName) + '</strong>: ';
+          mHtml += '<span style="color:#334155;">' + esc(item.memo) + '</span>';
+          mHtml += '</td>';
+        }
+        if (memoList.length % 2 !== 0) {
+          mHtml += '<td style="width:50%; border-bottom:1px dashed #fde68a;"></td>';
+        }
+        mHtml += '</tr></table>';
+      }
+      mHtml += '</div>';
+      return mHtml;
+    }
+
+    var cellHeight = (weeks.length >= 6) ? '92px' : '110px';
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>';
+    html += '@page { size: A4 portrait; margin: 10mm 8mm; }';
+    html += 'body { font-family: "IPAGothic", "MS Gothic", sans-serif; color: #0f172a; margin: 0; padding: 0; }';
+    html += '.page-left { page-break-after: always; }';
+    html += 'h2 { margin: 0 0 8px 0; font-size: 14pt; }';
+    html += 'table.cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }';
+    html += 'table.cal-table th { background-color: #f1f5f9; border: 1px solid #64748b; padding: 5px; font-size: 10pt; text-align: center; }';
+    html += 'table.cal-table td { border: 1px solid #64748b; vertical-align: top; padding: 5px; height: ' + cellHeight + '; }';
+    html += '.free-item { display: inline-block; background-color: #d97706; color: #ffffff; font-size: 7pt; padding: 1px 4px; margin: 1px; font-weight: bold; }';
+    html += '</style></head><body>';
+
+    // 1ページ目（左側：日〜水曜日の4列 ＋ 伝達事項の前半）
+    html += '<div class="page-left">';
+    html += '<h2 style="text-align: left;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(1/2 左側：日〜水)</span></h2>';
+    html += buildCalendarTableHtml(0, 3);
+    html += buildMemosBoxHtml(leftMemos, '(1/2)');
+    html += '</div>';
+
+    // 2ページ目（右側：木〜土曜日の3列 ＋ 伝達事項の後半）
+    html += '<div class="page-right">';
+    html += '<h2 style="text-align: right;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(2/2 右側：木〜土)</span></h2>';
+    html += buildCalendarTableHtml(4, 6);
+    html += buildMemosBoxHtml(rightMemos, '(2/2)');
+    html += '</div>';
+
+    html += '</body></html>';
+
+    var blob = Utilities.newBlob(html, 'text/html', 'calendar_a4_spread.html').getAs('application/pdf');
+    var fileName = yearMonth + '_シフト予定表_A4縦2枚見開き.pdf';
+    blob.setName(fileName);
+
+    return {
+      success: true,
+      base64: Utilities.base64Encode(blob.getBytes()),
+      fileName: fileName,
+      mimeType: 'application/pdf'
+    };
+  } catch (error) {
+    return { success: false, message: 'PDF出力エラー: ' + error.message };
+  }
+}
