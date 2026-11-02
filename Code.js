@@ -3445,3 +3445,37 @@ function generateA3CalendarPdf(yearMonth) {
     return { success: false, message: 'PDF出力エラー: ' + error.message };
   }
 }
+
+/**
+ * 💡 スタッフが自分の勤怠申請履歴を削除する関数
+ */
+function deleteKintaiData(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("申請データ");
+    if (!sheet) {
+      throw new Error("「申請データ」シートが見つかりません。");
+    }
+    
+    var sheetData = sheet.getDataRange().getValues();
+    var targetRow = -1;
+    
+    for (var i = 1; i < sheetData.length; i++) {
+      if (String(sheetData[i][0]) === String(data.requestId)) {
+        targetRow = i + 1;
+        break;
+      }
+    }
+    
+    if (targetRow === -1) {
+      return { success: false, message: "対象の申請データが見つかりませんでした。" };
+    }
+    
+    // 該当行を削除
+    sheet.deleteRow(targetRow);
+    
+    return { success: true, message: "申請履歴を削除しました！" };
+  } catch (error) {
+    return { success: false, message: "削除エラー: " + error.message };
+  }
+}

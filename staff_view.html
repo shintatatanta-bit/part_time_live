@@ -43,6 +43,9 @@
       .btn-edit { background: var(--warning-color); color: white; border: none; padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; font-weight: 600; width: auto; }
       .btn-edit:hover { background: #b45309; }
       
+.btn-delete { background: var(--danger-color); color: white; border: none; padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; font-weight: 600; width: auto; margin-left: 4px; }
+      .btn-delete:hover { background: #be123c; }
+
       .edit-banner { background: #fef3c7; border: 1px solid #f59e0b; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85rem; display: none; justify-content: space-between; align-items: center; color: #92400e; }
     
       /* 🔒 管理者閲覧ロック時のスタイル */
@@ -368,6 +371,7 @@
                 }
 
                 var html = '';
+
                 res.history.forEach(function(item, idx) {
                   var isLocked = lockedDatesMap[item.workDate] === true;
                   
@@ -380,7 +384,11 @@
                   if (isLocked) {
                     html += '<td style="text-align: center;"><span style="font-size: 0.7rem; background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 4px; font-weight: 600;">🔒 ロック中</span></td>';
                   } else {
-                    html += '<td style="text-align: center;"><button type="button" class="btn-edit" onclick="startEdit(' + idx + ')">修正</button></td>';
+                    // 💡 「修正」ボタンの横に「削除」ボタンを追加します
+                    html += '<td style="text-align: center;">';
+                    html += '<button type="button" class="btn-edit" onclick="startEdit(' + idx + ')">修正</button>';
+                    html += '<button type="button" class="btn-delete" onclick="deleteMyKintaiRequest(\'' + item.requestId + '\')">削除</button>';
+                    html += '</td>';
                   }
                   
                   html += '</tr>';
@@ -906,6 +914,29 @@
           showToast('ロックを解除しました。', true);
         }
       }
+
+      function deleteMyKintaiRequest(requestId) {
+        if (!confirm("この申請履歴を本当に削除しますか？")) {
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            showToast(res.message, res.success);
+            if (res.success) {
+              // 💡 削除成功後、即座に履歴リストと未提出アラートを再読み込みして自動更新します
+              loadStaffHistory(); 
+              if (typeof loadStaffPendingAlert === 'function') {
+                loadStaffPendingAlert();
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            alert("通信エラー: " + err.message);
+          })
+          .deleteKintaiData({ requestId: requestId });
+      }
+      
     </script>
   </body>
 </html>
