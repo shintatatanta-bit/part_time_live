@@ -511,7 +511,14 @@
         var submitBtn = document.getElementById('kintaiSubmitBtn');
         var isEdit = !!requestId;
 
+        // 💡 【追加】ボタンを押した瞬間にすぐ非効化して連打を防ぐ
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerText = '送信中...';
+        }
+
         function proceedSave() {
+          // （ここは既にsubmitBtnを無効化していますが、念のため残してもOKです）
           if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerText = '送信中...';
@@ -528,8 +535,23 @@
                 if (typeof loadStaffPendingAlert === 'function') {
                   loadStaffPendingAlert();
                 }
+                
+                // 💡 【追加】申請成功後にフォームをきれいに自動リフレッシュ（初期化）する
+                document.getElementById('kintaiForm').reset();
+                var now = new Date();
+                var y = now.getFullYear();
+                var m = String(now.getMonth() + 1).padStart(2, '0');
+                var d = String(now.getDate()).padStart(2, '0');
+                document.getElementById('workDate').value = y + '-' + m + '-' + d;
+                document.getElementById('breakTime').value = "";
+                document.getElementById('transportCost').value = "0";
+                
+                // ボタンの有効・無効を再判定して薄い緑（非活性）に戻す
+                validateKintaiForm();
+                
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-              } else {
+              } 
+              else {
                 if (submitBtn) {
                   submitBtn.disabled = false;
                   submitBtn.innerText = isEdit ? '修正を保存する' : '申請を送信する';
@@ -740,6 +762,7 @@
         };
 
         var btn = event.target;
+        // 💡 【追加】ボタンを押した瞬間にすぐ非活性化
         if (btn) {
           btn.disabled = true;
           btn.innerText = '送信中...';
