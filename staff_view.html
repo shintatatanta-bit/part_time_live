@@ -60,9 +60,39 @@
         font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;
         font-weight: bold;
       }
+
+      /* 💡 全画面ローディングオーバーレイ */
+      #loadingOverlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 99999;
+        justify-content: center;
+        align-items: center;
+      }
+      .loading-box {
+        background: #fff;
+        color: var(--text-main);
+        padding: 24px 36px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        text-align: center;
+        font-size: 1rem;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
+
+    <!-- 💡 全画面ローディング表示用 -->
+    <div id="loadingOverlay">
+      <div class="loading-box">
+        <div style="font-size: 1.8rem; margin-bottom: 8px;">⏳</div>
+        <div>送信中です。<br>しばらくお待ちください...</div>
+      </div>
+    </div>
 
     <!-- 本来のスタッフポータル画面 -->
     <div id="portalContent" class="portal-container">
@@ -511,14 +541,20 @@
         var submitBtn = document.getElementById('kintaiSubmitBtn');
         var isEdit = !!requestId;
 
-        // 💡 【追加】ボタンを押した瞬間にすぐ非効化して連打を防ぐ
+       // 💡 【追加】送信が始まったら全画面ローディングを表示
+        var loadingEl = document.getElementById('loadingOverlay');
+        if (loadingEl) loadingEl.style.display = 'flex';
+
         if (submitBtn) {
           submitBtn.disabled = true;
           submitBtn.innerText = '送信中...';
         }
 
         function proceedSave() {
-          // （ここは既にsubmitBtnを無効化していますが、念のため残してもOKです）
+          // 💡 【追加1】送信が始まった瞬間に、全画面のローディング画面を表示する
+          var loadingEl = document.getElementById('loadingOverlay');
+          if (loadingEl) loadingEl.style.display = 'flex';
+
           if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerText = '送信中...';
@@ -528,6 +564,9 @@
 
           google.script.run
             .withSuccessHandler(function(res) {
+              // 💡 【追加2】処理が成功して戻ってきたらローディングを隠す
+              if (loadingEl) loadingEl.style.display = 'none';
+
               showToast(res.message, res.success);
               if (res.success) {
                 cancelEditMode();
@@ -535,23 +574,8 @@
                 if (typeof loadStaffPendingAlert === 'function') {
                   loadStaffPendingAlert();
                 }
-                
-                // 💡 【追加】申請成功後にフォームをきれいに自動リフレッシュ（初期化）する
-                document.getElementById('kintaiForm').reset();
-                var now = new Date();
-                var y = now.getFullYear();
-                var m = String(now.getMonth() + 1).padStart(2, '0');
-                var d = String(now.getDate()).padStart(2, '0');
-                document.getElementById('workDate').value = y + '-' + m + '-' + d;
-                document.getElementById('breakTime').value = "";
-                document.getElementById('transportCost').value = "0";
-                
-                // ボタンの有効・無効を再判定して薄い緑（非活性）に戻す
-                validateKintaiForm();
-                
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-              } 
-              else {
+              } else {
                 if (submitBtn) {
                   submitBtn.disabled = false;
                   submitBtn.innerText = isEdit ? '修正を保存する' : '申請を送信する';
@@ -559,6 +583,9 @@
               }
             })
             .withFailureHandler(function(err) {
+              // 💡 【追加3】通信エラーなどで失敗したときもローディングを隠す
+              if (loadingEl) loadingEl.style.display = 'none';
+
               alert('通信エラーが発生しました: ' + err.message);
               if (submitBtn) {
                 submitBtn.disabled = false;
