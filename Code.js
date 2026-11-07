@@ -450,14 +450,21 @@ function getStaffList() {
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
       if (row[0]) {
+        var staffName = String(row[1] || "").trim();
+        
+        // 💡 【追加】スタッフ名に「テスト」が含まれている場合はダッシュボードに表示しない
+        if (staffName.indexOf("テスト") !== -1) {
+          continue; 
+        }
+
         staffList.push({
           staffId: row[0],
-          staffName: row[1],
+          staffName: staffName,
           lineUserId: row[2],
           assignedAccount: row[3],
           status: row[4],
           staffUrl: row[6] || "",
-          displayChar: row[7] || row[1].substring(0, 1)
+          displayChar: row[7] || staffName.substring(0, 1)
         });
       }
     }
@@ -506,6 +513,11 @@ function getKintaiSummary(startDate, endDate) {
     var staffMap = {};
     for (var i = 1; i < staffData.length; i++) {
       var sId = staffData[i][0];
+      var sName = String(staffData[i][1] || "").trim();
+      
+      // 💡 【追加】テスト用アカウントを除外
+      if (isTestStaff(sName)) continue;
+
       if (sId) {
         staffMap[sId] = {
           staffId: sId,
@@ -2067,10 +2079,12 @@ function getClosingStatus(data) {
     
     var staffList = [];
     for (var i = 1; i < staffData.length; i++) {
-      var sId = String(staffData[i][0] || "").trim().toLowerCase();
+      var sId = String(staffData[i][0] || "").trim();
       var sName = String(staffData[i][1] || "").trim();
       var sStatus = String(staffData[i][4] || "").trim();
-      console.log("👤 スタッフ行[" + i + "] ID(小文字): [" + sId + "] 名前: [" + sName + "] ステータス: [" + sStatus + "]");
+      
+      // 💡 【追加】テスト用アカウントを除外
+      if (isTestStaff(sName)) continue;
       
       if (sId && sStatus === "有効") {
         staffList.push({
@@ -2655,6 +2669,9 @@ function getAllStaffWagesForPeriod(data) {
       var sId = String(staffData[i][0] || "").trim();
       var sName = String(staffData[i][1] || "").trim();
       var status = String(staffData[i][4] || "").trim();
+      
+      // 💡 【追加】テスト用アカウントを除外
+      if (isTestStaff(sName)) continue;
       
       if (sId && status === "有効") {
         var wage = getEffectiveHourlyWage(sId, data.yearMonth, data.half);
@@ -3490,4 +3507,9 @@ function saveShiftOrderAndSchedules(data) {
   } catch (error) {
     return { success: false, message: "順序保存エラー: " + error.message };
   }
+}
+
+// 💡 スタッフ名に「テスト」が含まれるかを判定するヘルパー
+function isTestStaff(staffName) {
+  return String(staffName || "").indexOf("テスト") !== -1;
 }
