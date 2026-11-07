@@ -569,11 +569,40 @@
 
               showToast(res.message, res.success);
               if (res.success) {
-                cancelEditMode();
+                // 💡 編集モードを解除し、フォームをきれいにリセットする
+                document.getElementById('editRequestId').value = '';
+                document.getElementById('kintaiForm').reset();
+                
+                // 日付や交通費などの初期値を再セット
+                var now = new Date();
+                var y = now.getFullYear();
+                var m = String(now.getMonth() + 1).padStart(2, '0');
+                var d = String(now.getDate()).padStart(2, '0');
+                document.getElementById('workDate').value = y + '-' + m + '-' + d;
+                document.getElementById('breakTime').value = "";
+                document.getElementById('transportCost').value = "0";
+                
+                var hours = String(now.getHours()).padStart(2, '0');
+                var minutes = String(now.getMinutes()).padStart(2, '0');
+                document.getElementById('endTime').value = hours + ':' + minutes;
+
+                // タイトルや送信ボタンの状態を初期状態に戻す
+                document.getElementById('formTitle').innerText = '勤怠・交通費の申請';
+                document.getElementById('editModeBanner').style.display = 'none';
+                if (submitBtn) {
+                  submitBtn.innerText = '申請を送信する';
+                  submitBtn.style.background = 'var(--success-color)';
+                }
+
+                // 履歴やアラートを更新
                 loadStaffHistory();
                 if (typeof loadStaffPendingAlert === 'function') {
                   loadStaffPendingAlert();
                 }
+                
+                // ボタンの有効・無効状態を再判定
+                validateKintaiForm();
+                
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               } else {
                 if (submitBtn) {
