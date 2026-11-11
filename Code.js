@@ -697,24 +697,23 @@ function getShiftSchedule(yearMonth) {
     
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      var shiftId = row[0];
+      // 💡 万が一、スプレッドシート側で勝手に日付型にされてもエラー（null）にならないよう、すべて強制的に「文字（String）」に変換する
+      var shiftId = String(row[0] || "").trim();
       var workDate = row[1];
-      var staffId = row[2];
-      var staffName = row[3];
-      var dailyMemo = row[4] || ""; // E列から取得
+      var staffId = String(row[2] || "").trim();
+      var staffName = String(row[3] || "").trim();
+      var dailyMemo = String(row[4] || "").trim(); // ← 🚨ここが超重要！
       
-      // 💡 万が一、空行や日付・スタッフIDがない不正なデータが混ざっていても、エラーで止まらずにスキップする
-      if (!workDate || !staffId || !staffName) continue;
+      if (!workDate || !staffId) continue;
       
       var d = new Date(workDate);
-      if (isNaN(d.getTime())) continue; // 💡 日付と認識できない文字列の場合はスキップ
+      if (isNaN(d.getTime())) continue;
       
       var y = d.getFullYear();
       var m = ('0' + (d.getMonth() + 1)).slice(-2);
       var day = ('0' + d.getDate()).slice(-2);
       var dateStr = y + '-' + m + '-' + day;
       
-      // 指定された年月のデータのみ抽出
       if (dateStr.indexOf(yearMonth) === 0) {
         shifts.push({ shiftId: shiftId, workDate: dateStr, staffId: staffId, staffName: staffName, dailyMemo: dailyMemo });
       }
@@ -722,9 +721,7 @@ function getShiftSchedule(yearMonth) {
 
     return { success: true, shifts: shifts };
   } catch (error) {
-    console.error("シフト取得エラー:", error.message);
-    // 💡 万が一エラーが起きても、nullを返さずに空配列とエラーメッセージを返すことで画面をフリーズさせない
-    return { success: false, message: "シフト取得エラー: " + error.message, shifts: [] };
+    return { success: false, message: "シフト取得エラー: " + error.message };
   }
 }
 
