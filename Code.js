@@ -3321,8 +3321,6 @@ function generateA3CalendarPdf(yearMonth) {
 
     // 💡 月曜始まりの配列に変更
     var weekDaysAll = ["月", "火", "水", "木", "金", "土", "日"];
-    // 💡 月曜始まりの配列に変更
-    var weekDaysAll = ["月", "火", "水", "木", "金", "土", "日"];
     function buildCalendarTableHtml(startCol, endCol) {
       var tHtml = '<table class="cal-table"><thead><tr>';
       for (var c = startCol; c <= endCol; c++) {
@@ -3356,7 +3354,7 @@ function generateA3CalendarPdf(yearMonth) {
             tHtml += '</div>';
 
             if (shiftMap[cell.dateStr]) {
-              // 💡 スプレッドシートの並び順をそのまま維持する
+              // 💡 スプレッドシートの並び順をそのまま維持する（ソート処理を削除）
               var dayShifts = shiftMap[cell.dateStr];
 
               tHtml += '<div style="margin-top:2px; line-height: 1.5;">';
@@ -3437,7 +3435,6 @@ function generateA3CalendarPdf(yearMonth) {
     html += '.free-item { display: inline-block; background-color: #d97706; color: #ffffff; font-size: 7pt; padding: 1px 4px; margin: 1px; font-weight: bold; }';
     html += '</style></head><body>';
 
-    // 1ページ目（左側：日〜水曜日の4列 ＋ 伝達事項の前半）
     // 1ページ目（左側：月〜木曜日の4列）
     html += '<div class="page-left">';
     html += '<h2 style="text-align: left;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(1/2 左側：月〜木)</span></h2>';
