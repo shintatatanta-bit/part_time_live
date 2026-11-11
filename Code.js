@@ -3241,10 +3241,8 @@ function generateA3CalendarPdf(yearMonth) {
     var freeSchedules = freeRes.success ? freeRes.freeSchedules : [];
 
     var staffCharMap = {};
-    var staffIdOrder = []; // 💡 画面上のスタッフIDの並び順をそのまま保持する配列
-    staffList.forEach(function(st, idx) {
+    staffList.forEach(function(st) {
       staffCharMap[st.staffId] = st.displayChar || st.staffName.substring(0, 1);
-      staffIdOrder.push(String(st.staffId).trim());
     });
 
     var shiftMap = {};
