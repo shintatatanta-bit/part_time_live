@@ -505,14 +505,15 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
 
         <p style="font-size: 0.75rem; color: var(--text-sub); margin: 12px 0 12px 0;">💡 スマホ・PC共通：上のパレットから**チップをタップして選択**し、配置したい日付枠をタップしてください。</p>
 
+        <!-- 修正後（月曜始まりに変更） -->
         <div class="cal-grid" id="calendarGrid">
-          <div class="cal-header-cell">日</div>
           <div class="cal-header-cell">月</div>
           <div class="cal-header-cell">火</div>
           <div class="cal-header-cell">水</div>
           <div class="cal-header-cell">木</div>
           <div class="cal-header-cell">金</div>
-          <div class="cal-header-cell">土</div>
+          <div class="cal-header-cell" style="color: var(--accent-color);">土</div>
+          <div class="cal-header-cell" style="color: var(--danger-color);">日</div>
         </div>
 
         <div id="calendarList" class="list-view-container" style="display: none; margin-top: 12px;"></div>
@@ -1109,24 +1110,35 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         printDoc.open();
         printDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + titleText + '</title>');
         printDoc.write('<style>');
-        printDoc.write('@page { size: A4 landscape; margin: 10mm; }');
-        printDoc.write('* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }');
-        printDoc.write('body { font-family: sans-serif; margin: 0; padding: 5px; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; }');
-        printDoc.write('h2 { text-align: center; margin: 0 0 10px 0; font-size: 1.4rem; }');
-        printDoc.write('.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: 100%; max-width: 100%; }');
-        printDoc.write('.cal-header-cell { text-align: center; font-weight: bold; font-size: 0.9rem; padding: 6px 4px; background: #f1f5f9; border-radius: 4px; }');
-        printDoc.write('.cal-header-cell:nth-child(1) { color: #e11d48; }');
-        printDoc.write('.cal-header-cell:nth-child(7) { color: #2563eb; }');
-        printDoc.write('.cal-cell { min-height: 125px; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; box-sizing: border-box; position: relative; }');
+        // 💡 変更1: 6週あってもA4横1ページに必ず収まるように余白を少しスリムにする
+        printDoc.write('@page { size: A4 landscape; margin: 6mm; }');
+        printDoc.write('* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }');
+        printDoc.write('body { font-family: sans-serif; margin: 0; padding: 0; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }');
+        printDoc.write('h2 { text-align: center; margin: 0 0 6px 0; font-size: 1.2rem; }');
+        printDoc.write('.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: 100%; max-width: 100%; }');
+        
+        // 💡 変更2: 曜日ヘッダーの文字色を強制的に指定（月〜金:黒、土:青、日:赤）
+        printDoc.write('.cal-header-cell { text-align: center; font-weight: bold; font-size: 0.85rem; padding: 4px; background: #f1f5f9; border-radius: 4px; color: #334155; }');
+        printDoc.write('.cal-header-cell:nth-child(6) { color: #2563eb; }'); // 6番目（土曜）を青
+        printDoc.write('.cal-header-cell:nth-child(7) { color: #e11d48; }'); // 7番目（日曜）を赤
+        
+        // 💡 変更3: 6週ある月でもハミ出ないよう、セルの高さを固定値ではなく「flex」や「min-height」で自動調整させる
+        printDoc.write('.cal-cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; position: pointer; display: flex; flex-direction: column; justify-content: flex-start; }');
+        printDoc.write('body { height: 100vh; }');
+        printDoc.write('.cal-grid { height: calc(100% - 30px); }');
+        
+        // 💡 変更4: 6週すべてを綺麗に収めるため、A4横の用紙縦幅に合わせてセルの高さを自動配分する
+        printDoc.write('.cal-cell { min-height: calc((190mm - 20px) / 6); }'); // 6週で割って自動フィット
+        
         printDoc.write('.cal-cell.other-month { background: #f8fafc; opacity: 0.3; }');
         printDoc.write('.cal-cell.closed-day { background: #f1f5f9 !important; border: 1px dashed #cbd5e1 !important; }');
-        printDoc.write('.cal-date-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }');
-        printDoc.write('.cal-date-num { font-size: 0.9rem; font-weight: bold; color: #475569; }');
+        printDoc.write('.cal-date-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }');
+        printDoc.write('.cal-date-num { font-size: 0.85rem; font-weight: bold; color: #475569; }');
         printDoc.write('.cal-date-num.sun-or-hol { color: #e11d48; }');
-        printDoc.write('.cal-section-shift { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; position: relative; }');
-        printDoc.write('.staff-circle-badge { color: white !important; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10pt !important; font-weight: bold; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }');
-        printDoc.write('.memo-badge-icon { position: absolute; top: -6px; left: -6px; font-size: 8pt !important; background: #f59e0b; color: white; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; z-index: 10; }');
-        printDoc.write('.free-badge { background: #d97706 !important; color: white !important; font-size: 7pt !important; padding: 2px 4px; border-radius: 3px; display: inline-flex; align-items: center; }');
+        printDoc.write('.cal-section-shift { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; position: relative; }');
+        printDoc.write('.staff-circle-badge { color: white !important; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 8pt !important; font-weight: bold; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }');
+        printDoc.write('.memo-badge-icon { position: absolute; top: -5px; left: -5px; font-size: 7pt !important; background: #f59e0b; color: white; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; z-index: 10; }');
+        printDoc.write('.free-badge { background: #d97706 !important; color: white !important; font-size: 6.5pt !important; padding: 1px 3px; border-radius: 3px; display: inline-flex; align-items: center; }');
         printDoc.write('.del-x { display: none; }');
         printDoc.write('</style>');
         printDoc.write('</head><body>');
@@ -1432,7 +1444,8 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
 
         var firstDayObj = new Date(year, month - 1, 1);
         var lastDayObj = new Date(year, month, 0);
-        var firstDayOfWeek = firstDayObj.getDay();
+        // 💡 月曜始まりのインデックスに変換 (月=0, 火=1, ..., 日=6)
+        var firstDayOfWeek = (firstDayObj.getDay() + 6) % 7;
         var totalDays = lastDayObj.getDate();
         var prevLastDayObj = new Date(year, month - 1, 0);
         var prevLastDay = prevLastDayObj.getDate();

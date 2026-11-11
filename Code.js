@@ -3241,10 +3241,10 @@ function generateA3CalendarPdf(yearMonth) {
     var freeSchedules = freeRes.success ? freeRes.freeSchedules : [];
 
     var staffCharMap = {};
-    var staffOrderMap = {};
+    var staffIdOrder = []; // 💡 画面上のスタッフIDの並び順をそのまま保持する配列
     staffList.forEach(function(st, idx) {
       staffCharMap[st.staffId] = st.displayChar || st.staffName.substring(0, 1);
-      staffOrderMap[st.staffId] = idx;
+      staffIdOrder.push(String(st.staffId).trim());
     });
 
     var shiftMap = {};
@@ -3285,7 +3285,8 @@ function generateA3CalendarPdf(yearMonth) {
 
     var firstDayObj = new Date(year, month - 1, 1);
     var lastDayObj = new Date(year, month, 0);
-    var firstDayOfWeek = firstDayObj.getDay();
+    // 💡 月曜始まりの計算に変更
+    var firstDayOfWeek = (firstDayObj.getDay() + 6) % 7;
     var totalDays = lastDayObj.getDate();
     var prevLastDay = new Date(year, month - 1, 0).getDate();
 
@@ -3318,11 +3319,12 @@ function generateA3CalendarPdf(yearMonth) {
       weeks.push(allCells.slice(wIdx, wIdx + 7));
     }
 
-    var weekDaysAll = ["日", "月", "火", "水", "木", "金", "土"];
+    // 💡 月曜始まりの配列に変更
+    var weekDaysAll = ["月", "火", "水", "木", "金", "土", "日"];
     function buildCalendarTableHtml(startCol, endCol) {
       var tHtml = '<table class="cal-table"><thead><tr>';
       for (var c = startCol; c <= endCol; c++) {
-        var thColor = (c === 0) ? '#e11d48' : (c === 6 ? '#2563eb' : '#334155');
+        var thColor = (c === 6) ? '#e11d48' : (c === 5 ? '#2563eb' : '#334155');
         tHtml += '<th style="color:' + thColor + ';">' + weekDaysAll[c] + '</th>';
       }
       tHtml += '</tr></thead><tbody>';
@@ -3349,12 +3351,10 @@ function generateA3CalendarPdf(yearMonth) {
             }
             tHtml += '</div>';
 
+            // 💡 シフトデータの処理（スプレッドシートの並び順をそのまま反映）
             if (shiftMap[cell.dateStr]) {
-              var dayShifts = shiftMap[cell.dateStr].sort(function(a, b) {
-                var oa = (staffOrderMap[a.staffId] !== undefined) ? staffOrderMap[a.staffId] : 999;
-                var ob = (staffOrderMap[b.staffId] !== undefined) ? staffOrderMap[b.staffId] : 999;
-                return oa - ob;
-              });
+              var dayShifts = shiftMap[cell.dateStr];
+
               tHtml += '<div style="margin-top:2px; line-height: 1.5;">';
               dayShifts.forEach(function(sh) {
                 var dispChar = staffCharMap[sh.staffId] || sh.staffName.substring(0, 1);
@@ -3363,7 +3363,6 @@ function generateA3CalendarPdf(yearMonth) {
                 var cleanM = rawMemo.replace('||color:yellow', '').replace('||color:blue', '').trim();
                 
                 var textColor = isYellow ? '#b45309' : '#047857'; 
-                // 💡 [!] マークをスタッフ名の【後ろ】にくっつけて表示する
                 var memoIndicator = cleanM ? '<span style="color:#d97706; font-size:8pt; font-weight:bold; margin-left:2px;">[!]</span>' : '';
                 
                 tHtml += '<span style="color: ' + textColor + '; margin-right: 8px; display: inline-block; font-weight: bold; font-size: 9.5pt;">' + esc(dispChar) + memoIndicator + '</span>';
@@ -3371,6 +3370,7 @@ function generateA3CalendarPdf(yearMonth) {
               tHtml += '</div>';
             }
 
+            // 💡 フリー予定の処理
             if (freeMap[cell.dateStr]) {
               tHtml += '<div style="margin-top:2px;">';
               freeMap[cell.dateStr].forEach(function(fs) {
@@ -3378,6 +3378,7 @@ function generateA3CalendarPdf(yearMonth) {
               });
               tHtml += '</div>';
             }
+            
             tHtml += '</td>';
           }
         }
@@ -3433,16 +3434,17 @@ function generateA3CalendarPdf(yearMonth) {
     html += '</style></head><body>';
 
     // 1ページ目（左側：日〜水曜日の4列 ＋ 伝達事項の前半）
+    // 1ページ目（左側：月〜木曜日の4列）
     html += '<div class="page-left">';
-    html += '<h2 style="text-align: left;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(1/2 左側：日〜水)</span></h2>';
-    html += buildCalendarTableHtml(0, 3);
+    html += '<h2 style="text-align: left;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(1/2 左側：月〜木)</span></h2>';
+    html += buildCalendarTableHtml(0, 3); // 0〜3列目 (月〜木)
     html += buildMemosBoxHtml(leftMemos, '(1/2)');
     html += '</div>';
 
-    // 2ページ目（右側：木〜土曜日の3列 ＋ 伝達事項の後半）
+    // 2ページ目（右側：金〜日曜日の3列）
     html += '<div class="page-right">';
-    html += '<h2 style="text-align: right;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(2/2 右側：木〜土)</span></h2>';
-    html += buildCalendarTableHtml(4, 6);
+    html += '<h2 style="text-align: right;">' + esc(titleText) + ' <span style="font-size:10pt; font-weight:normal; color:#475569;">(2/2 右側：金〜日)</span></h2>';
+    html += buildCalendarTableHtml(4, 6); // 4〜6列目 (金〜日)
     html += buildMemosBoxHtml(rightMemos, '(2/2)');
     html += '</div>';
 
