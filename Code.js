@@ -703,17 +703,18 @@ function getShiftSchedule(yearMonth) {
       var staffName = row[3];
       var dailyMemo = row[4] || ""; // E列から取得
       
-      if (!workDate || !staffId) continue;
+      // 💡 万が一、空行や日付・スタッフIDがない不正なデータが混ざっていても、エラーで止まらずにスキップする
+      if (!workDate || !staffId || !staffName) continue;
+      
       var d = new Date(workDate);
-      if (isNaN(d.getTime())) continue;
+      if (isNaN(d.getTime())) continue; // 💡 日付と認識できない文字列の場合はスキップ
       
       var y = d.getFullYear();
       var m = ('0' + (d.getMonth() + 1)).slice(-2);
       var day = ('0' + d.getDate()).slice(-2);
       var dateStr = y + '-' + m + '-' + day;
       
-      if (!workDate || !staffId) continue;
-      // ...(中略)...
+      // 指定された年月のデータのみ抽出
       if (dateStr.indexOf(yearMonth) === 0) {
         shifts.push({ shiftId: shiftId, workDate: dateStr, staffId: staffId, staffName: staffName, dailyMemo: dailyMemo });
       }
@@ -721,7 +722,9 @@ function getShiftSchedule(yearMonth) {
 
     return { success: true, shifts: shifts };
   } catch (error) {
-    return { success: false, message: "シフト取得エラー: " + error.message };
+    console.error("シフト取得エラー:", error.message);
+    // 💡 万が一エラーが起きても、nullを返さずに空配列とエラーメッセージを返すことで画面をフリーズさせない
+    return { success: false, message: "シフト取得エラー: " + error.message, shifts: [] };
   }
 }
 
