@@ -3321,12 +3321,16 @@ function generateA3CalendarPdf(yearMonth) {
 
     // 💡 月曜始まりの配列に変更
     var weekDaysAll = ["月", "火", "水", "木", "金", "土", "日"];
+    // 💡 月曜始まりの配列に変更
+    var weekDaysAll = ["月", "火", "水", "木", "金", "土", "日"];
     function buildCalendarTableHtml(startCol, endCol) {
       var tHtml = '<table class="cal-table"><thead><tr>';
       for (var c = startCol; c <= endCol; c++) {
+        // 💡 5番目が土曜(青)、6番目が日曜(赤)
         var thColor = (c === 6) ? '#e11d48' : (c === 5 ? '#2563eb' : '#334155');
         tHtml += '<th style="color:' + thColor + ';">' + weekDaysAll[c] + '</th>';
       }
+
       tHtml += '</tr></thead><tbody>';
 
       weeks.forEach(function(weekRow) {
@@ -3351,11 +3355,12 @@ function generateA3CalendarPdf(yearMonth) {
             }
             tHtml += '</div>';
 
-            // 💡 シフトデータの処理（スプレッドシートの並び順をそのまま反映）
             if (shiftMap[cell.dateStr]) {
+              // 💡 スプレッドシートの並び順をそのまま維持する
               var dayShifts = shiftMap[cell.dateStr];
 
               tHtml += '<div style="margin-top:2px; line-height: 1.5;">';
+              
               dayShifts.forEach(function(sh) {
                 var dispChar = staffCharMap[sh.staffId] || sh.staffName.substring(0, 1);
                 var rawMemo = String(sh.dailyMemo || '');
@@ -3363,6 +3368,7 @@ function generateA3CalendarPdf(yearMonth) {
                 var cleanM = rawMemo.replace('||color:yellow', '').replace('||color:blue', '').trim();
                 
                 var textColor = isYellow ? '#b45309' : '#047857'; 
+                // 💡 [!] マークをスタッフ名の【後ろ】にくっつけて表示する
                 var memoIndicator = cleanM ? '<span style="color:#d97706; font-size:8pt; font-weight:bold; margin-left:2px;">[!]</span>' : '';
                 
                 tHtml += '<span style="color: ' + textColor + '; margin-right: 8px; display: inline-block; font-weight: bold; font-size: 9.5pt;">' + esc(dispChar) + memoIndicator + '</span>';
@@ -3370,7 +3376,6 @@ function generateA3CalendarPdf(yearMonth) {
               tHtml += '</div>';
             }
 
-            // 💡 フリー予定の処理
             if (freeMap[cell.dateStr]) {
               tHtml += '<div style="margin-top:2px;">';
               freeMap[cell.dateStr].forEach(function(fs) {
@@ -3378,7 +3383,6 @@ function generateA3CalendarPdf(yearMonth) {
               });
               tHtml += '</div>';
             }
-            
             tHtml += '</td>';
           }
         }
