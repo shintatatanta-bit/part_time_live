@@ -895,9 +895,9 @@
             html += '<div style="margin-bottom: 14px; padding-top: 8px; border-top: 1px solid var(--border-color);"><strong>ステータス:</strong> ' + statusBadge + '</div>';
 
             if (res.status !== '確定済み') {
-              html += '<button type="button" style="background: var(--success-color); width: 100%;" onclick="confirmStaffClosing()">🚀 内容を確定して管理者に報告する</button>';
+              html += '<button type="button" style="background: var(--success-color); width: 100%;" onclick="confirmStaffClosing()">🚀 内容を確定する</button>';
             } else {
-              html += '<p style="color: var(--success-color); font-size: 0.8rem; text-align: center; margin: 0; font-weight: 600;">この期間のデータは確定済みです。修正が必要な場合は管理者へご連絡ください。</p>';
+              html += '<p style="color: var(--success-color); font-size: 0.8rem; text-align: center; margin: 0; font-weight: 600;">この期間のデータは確定済みです。修正が必要な場合は連絡をください。</p>';
             }
 
             box.innerHTML = html;
@@ -910,7 +910,7 @@
         var ym = document.getElementById('staffClosingMonth').value;
         var half = document.getElementById('staffClosingHalf').value;
 
-        if (!confirm('この期間の勤務内容に間違いありませんか？\n確定すると管理者に報告され、内容がロックされます。')) return;
+        if (!confirm('この期間の勤務内容に間違いありませんか？\n確定すると報告され、内容がロックされます。')) return;
 
         google.script.run
           .withSuccessHandler(function(res) {

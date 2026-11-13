@@ -896,13 +896,16 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
         loadAccountOptions();
         loadAccountQrOptions();
         
+        // 💡 【追加】画面を開いた時に「月半期の開始日・終了日」を自動セットする
+        setCurrentPeriodToToday();
+        
         fetchSummary();
         loadLineHistory();
         loadPendingStaff();
         loadShiftNotifications();
         loadDuplicateKintaiAlerts();
         
-        // 💡 【追加】画面を開いた時にサーバーから上限人数を取得して入力欄にセットする
+        // 💡 画面を開いた時にサーバーから上限人数を取得して入力欄にセットする
         google.script.run.withSuccessHandler(function(limit) {
           var input = document.getElementById('maxStaffLimitInput');
           if (input) {
