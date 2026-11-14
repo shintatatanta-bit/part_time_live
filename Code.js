@@ -3525,3 +3525,155 @@ function saveShiftOrderAndSchedules(data) {
 function isTestStaff(staffName) {
   return String(staffName || "").indexOf("テスト") !== -1;
 }
+
+/**
+ * 💡 月次支払一覧用：指定した月の全スタッフの前半・後半・月間合計を集計する関数
+ */
+function getMonthlyPaymentSummary(yearMonth) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 対象月の設定
+    var parts = yearMonth.split('-');
+    var year = Number(parts[0]);
+    var month = Number(parts[1]);
+
+    // 1. スタッフ一覧の取得
+    var staffSheet = ss.getSheetByName("スタッフマスタ");
+    var staffData = staffSheet.getDataRange().getValues();
+    var staffMap = {};
+    var staffList = [];
+    
+    for (var i = 1; i < staffData.length; i++) {
+      var sId = String(staffData[i][0] || "").trim();
+      var sName = String(staffData[i][1] || "").trim();
+      var sStatus = String(staffData[i][4] || "").trim();
+      if (isTestStaff(sName)) continue;
+      
+      if (sId && sStatus === "有効") {
+        staffMap[sId] = {
+          staffId: sId,
+          staffName: sName,
+          first: { status: "未確定", wage: 1000, workMins: 0, cost: 0 },
+          second: { status: "未確定", wage: 1000, workMins: 0, cost: 0 }
+        };
+        staffList.push(sId);
+      }
+    }
+
+    // 2. 締めステータスの取得
+    var closingSheet = ss.getSheetByName("締め・確認管理");
+    if (closingSheet) {
+      var cData = closingSheet.getDataRange().getValues();
+      var keyFirst = yearMonth + "_first";
+      var keySecond = yearMonth + "_second";
+      for (var c = 1; c < cData.length; c++) {
+        var cId = String(cData[c][0]).trim();
+        var cKey = String(cData[c][1]).trim();
+        var cStatus = String(cData[c][2]).trim();
+        if (staffMap[cId]) {
+          if (cKey === keyFirst) staffMap[cId].first.status = cStatus;
+          if (cKey === keySecond) staffMap[cId].second.status = cStatus;
+        }
+      }
+    }
+
+    // 3. 時給の取得
+    for (var i = 0; i < staffList.length; i++) {
+      var sId = staffList[i];
+      staffMap[sId].first.wage = getEffectiveHourlyWage(sId, yearMonth, "first");
+      staffMap[sId].second.wage = getEffectiveHourlyWage(sId, yearMonth, "second");
+    }
+
+    // 4. 申請データから勤務時間と交通費を集計
+    var dataSheet = ss.getSheetByName("申請データ");
+    if (dataSheet) {
+      var kData = dataSheet.getDataRange().getValues();
+      
+      function parseDateToString(raw) {
+        if (!raw) return "";
+        if (raw instanceof Date) return Utilities.formatDate(raw, "Asia/Tokyo", "yyyy-MM-dd");
+        var str = String(raw).trim();
+        if (str.length >= 10 && str.indexOf("-") !== -1) return str.substring(0, 10);
+        var d = new Date(raw);
+        if (!isNaN(d.getTime())) return Utilities.formatDate(d, "Asia/Tokyo", "yyyy-MM-dd");
+        return str;
+      }
+      
+      for (var k = 1; k < kData.length; k++) {
+        var kId = String(kData[k][1] || "").trim();
+        var kDateStr = parseDateToString(kData[k][3]);
+        
+        if (staffMap[kId] && kDateStr.indexOf(yearMonth) === 0) {
+          var cost = Number(kData[k][7]) || 0;
+          var startTime = formatTime(kData[k][4]);
+          var endTime = formatTime(kData[k][5]);
+          var breakMins = Number(kData[k][6]) || 0;
+          var workMins = 0;
+          if (startTime && endTime) {
+            var sParts = startTime.split(":");
+            var eParts = endTime.split(":");
+            var startM = Number(sParts[0]) * 60 + Number(sParts[1]);
+            var endM = Number(eParts[0]) * 60 + Number(eParts[1]);
+            workMins = (endM - startM) - breakMins;
+            if (workMins < 0) workMins = 0;
+          }
+          
+          var dayNum = Number(kDateStr.split("-")[2]);
+          if (dayNum <= 15) {
+            staffMap[kId].first.workMins += workMins;
+            staffMap[kId].first.cost += cost;
+          } else {
+            staffMap[kId].second.workMins += workMins;
+            staffMap[kId].second.cost += cost;
+          }
+        }
+      }
+    }
+
+    // 5. 結果を画面用に計算・整形
+    var resultList = [];
+    for (var i = 0; i < staffList.length; i++) {
+      var sId = staffList[i];
+      var info = staffMap[sId];
+      
+      function formatHrs(mins) {
+        var h = Math.floor(mins / 60);
+        var m = mins % 60;
+        return h + "時間" + m + "分";
+      }
+      
+      var firstSalary = Math.round((info.first.workMins / 60) * info.first.wage);
+      var secondSalary = Math.round((info.second.workMins / 60) * info.second.wage);
+      
+      resultList.push({
+        staffId: info.staffId,
+        staffName: info.staffName,
+        first: {
+          status: info.first.status,
+          wage: info.first.wage,
+          workMinsStr: formatHrs(info.first.workMins),
+          salary: firstSalary,
+          cost: info.first.cost
+        },
+        second: {
+          status: info.second.status,
+          wage: info.second.wage,
+          workMinsStr: formatHrs(info.second.workMins),
+          salary: secondSalary,
+          cost: info.second.cost
+        },
+        total: {
+          workMinsStr: formatHrs(info.first.workMins + info.second.workMins),
+          salary: firstSalary + secondSalary,
+          cost: info.first.cost + info.second.cost,
+          totalPayment: firstSalary + secondSalary + info.first.cost + info.second.cost
+        }
+      });
+    }
+
+    return { success: true, list: resultList };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}

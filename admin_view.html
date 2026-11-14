@@ -410,8 +410,12 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
     <div class="header-container">
       <h2>🛠️ ダッシュボード</h2>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <!-- 💡 追加：時給設定を開くボタン -->
+        <!-- 💰 時給設定ボタン -->
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openWageModal()">💰 時給設定</button>
+        
+        <!-- 💸 【追加】月の支払額一覧ボタン -->
+        <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openPaymentModal()">💸 月の支払額一覧</button>
+        
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openClosingModal()">🔒 締め作業・確認</button>
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openStaffModal()">⚙️ スタッフ管理</button>
       </div>
@@ -824,6 +828,48 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
 
         <div style="text-align: right;">
           <button type="button" class="secondary" onclick="closeClosingModal()">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 💸 月次支払一覧 モーダルポップアップ -->
+    <div id="paymentModal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 900px; max-height: 85vh; width: 95%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px;">
+          <h4 style="margin: 0;">💸 月の支払額一覧</h4>
+          <button type="button" class="secondary" onclick="closePaymentModal()">✕ 閉じる</button>
+        </div>
+
+        <p style="font-size: 0.8rem; color: var(--text-sub); margin-top: 0;">
+          指定した月の「前半」「後半」および「合計支払額」を一覧で確認できます。
+        </p>
+        
+        <div class="flex-row" style="align-items: flex-end; gap: 10px; margin-bottom: 16px;">
+          <div class="flex-col" style="max-width: 200px;">
+            <label>対象月</label>
+            <input type="month" id="paymentMonthInput" onchange="loadPaymentData()" style="margin-top:4px;">
+          </div>
+          <button type="button" class="secondary" style="margin-bottom:0;" onclick="loadPaymentData()">🔄 更新</button>
+        </div>
+
+        <div style="overflow-x: auto; max-height: 450px; margin-bottom: 16px;">
+          <table style="min-width: 800px; font-size: 0.85rem;">
+            <thead>
+              <tr>
+                <th style="width: 130px;">スタッフ名</th>
+                <th style="width: 60px; text-align:center;">期間</th>
+                <th style="width: 80px; text-align:center;">ステータス</th>
+                <th style="width: 80px; text-align:right;">設定時給</th>
+                <th style="width: 100px; text-align:right;">勤務時間</th>
+                <th style="width: 100px; text-align:right;">給与総額</th>
+                <th style="width: 80px; text-align:right;">交通費</th>
+                <th style="width: 100px; text-align:right; color:#b45309;">合計支払額</th>
+              </tr>
+            </thead>
+            <tbody id="paymentTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-sub);">対象月を選択してください</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -2973,6 +3019,100 @@ var draggedSourceDate = null;
         } catch (e) {
           console.error("バッジドロップエラー:", e.message);
         }
+      }
+
+// 💡 月次支払一覧モーダルの制御
+      function openPaymentModal() {
+        document.getElementById('paymentModal').style.display = 'flex';
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var input = document.getElementById('paymentMonthInput');
+        if (!input.value) {
+          input.value = y + '-' + m;
+        }
+        loadPaymentData();
+      }
+
+      function closePaymentModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+      }
+
+      function loadPaymentData() {
+        var ym = document.getElementById('paymentMonthInput').value;
+        var tbody = document.getElementById('paymentTableBody');
+        
+        if (!ym) return;
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-sub);">集計中... しばらくお待ちください</td></tr>';
+        
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (!res.success) {
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--danger-color);">' + res.message + '</td></tr>';
+              return;
+            }
+            if (res.list.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-sub);">有効なスタッフがいません</td></tr>';
+              return;
+            }
+            
+            var html = '';
+            var grandTotalSalary = 0;
+            var grandTotalCost = 0;
+
+            res.list.forEach(function(item) {
+              var fBadge = item.first.status === '確定済み' ? '<span style="color: var(--success-color); font-weight: 600;">確定</span>' : '<span style="color: var(--danger-color); font-weight: 600;">未確定</span>';
+              var sBadge = item.second.status === '確定済み' ? '<span style="color: var(--success-color); font-weight: 600;">確定</span>' : '<span style="color: var(--danger-color); font-weight: 600;">未確定</span>';
+              
+              grandTotalSalary += item.total.salary;
+              grandTotalCost += item.total.cost;
+
+              html += '<tr>';
+              html += '<td rowspan="3" style="font-weight:bold; vertical-align:middle;">' + escapeHtml(item.staffName) + '</td>';
+              
+              // 前半行
+              html += '<td style="text-align:center; background:#f8fafc;">前半</td>';
+              html += '<td style="text-align:center;">' + fBadge + '</td>';
+              html += '<td style="text-align:right;">¥' + item.first.wage.toLocaleString() + '</td>';
+              html += '<td style="text-align:right;">' + item.first.workMinsStr + '</td>';
+              html += '<td style="text-align:right;">¥' + item.first.salary.toLocaleString() + '</td>';
+              html += '<td style="text-align:right;">¥' + item.first.cost.toLocaleString() + '</td>';
+              html += '<td style="text-align:right; border-bottom:none;"></td>';
+              html += '</tr>';
+
+              // 後半行
+              html += '<tr>';
+              html += '<td style="text-align:center; background:#f8fafc;">後半</td>';
+              html += '<td style="text-align:center;">' + sBadge + '</td>';
+              html += '<td style="text-align:right;">¥' + item.second.wage.toLocaleString() + '</td>';
+              html += '<td style="text-align:right;">' + item.second.workMinsStr + '</td>';
+              html += '<td style="text-align:right;">¥' + item.second.salary.toLocaleString() + '</td>';
+              html += '<td style="text-align:right;">¥' + item.second.cost.toLocaleString() + '</td>';
+              html += '<td style="text-align:right; border-bottom:none; border-top:none;"></td>';
+              html += '</tr>';
+
+              // 合計行
+              html += '<tr style="background:#eff6ff;">';
+              html += '<td colspan="3" style="text-align:right; font-weight:bold; color:#1e40af;">月間合計</td>';
+              html += '<td style="text-align:right; font-weight:bold; color:#1e40af;">' + item.total.workMinsStr + '</td>';
+              html += '<td style="text-align:right; font-weight:bold; color:#1e40af;">¥' + item.total.salary.toLocaleString() + '</td>';
+              html += '<td style="text-align:right; font-weight:bold; color:#1e40af;">¥' + item.total.cost.toLocaleString() + '</td>';
+              html += '<td style="text-align:right; font-weight:bold; color:#b45309; font-size:1.05em;">¥' + item.total.totalPayment.toLocaleString() + '</td>';
+              html += '</tr>';
+            });
+            
+            // 総合計
+            var grandPayment = grandTotalSalary + grandTotalCost;
+            html += '<tr style="background:#e0f2fe; border-top:2px solid #3b82f6;">';
+            html += '<td colspan="5" style="text-align:right; font-weight:bold; font-size:1.05em; color:#0369a1;">全スタッフ 月間総合計</td>';
+            html += '<td style="text-align:right; font-weight:bold; color:#0369a1;">¥' + grandTotalSalary.toLocaleString() + '</td>';
+            html += '<td style="text-align:right; font-weight:bold; color:#0369a1;">¥' + grandTotalCost.toLocaleString() + '</td>';
+            html += '<td style="text-align:right; font-weight:bold; color:#b45309; font-size:1.1em;">¥' + grandPayment.toLocaleString() + '</td>';
+            html += '</tr>';
+
+            tbody.innerHTML = html;
+          })
+          .getMonthlyPaymentSummary(ym);
       }
 
     </script>
