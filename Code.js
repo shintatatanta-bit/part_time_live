@@ -2513,7 +2513,7 @@ function getStaffSubmittedShiftDates(data) {
 }
 
 /**
- * 💡 指定された年月のシフト情報をSlack共有用テキストに変換して返す関数（スタッフのシフトのみ）
+ * 💡 指定された年月のシフト情報をSlack共有用テキストに変換して返す関数（カレンダー表示文字対応版）
  */
 function getSlackShiftText(yearMonth) {
   try {
@@ -2524,11 +2524,31 @@ function getSlackShiftText(yearMonth) {
     var year = Number(parts[0]);
     var month = Number(parts[1]);
     
-    // タイトル行（例: "10月シフト"）
+    // タイトル行（例: "11月シフト"）
     var slackText = month + "月シフト\n";
     
     var weekDays = ["日", "月", "火", "水", "木", "金", "土"];
     var lastDay = new Date(year, month, 0).getDate();
+
+    // 0. スタッフマスタからカレンダー表示文字のマップを作成
+    var staffCharById = {};
+    var staffCharByName = {};
+    var staffSheet = ss.getSheetByName("スタッフマスタ");
+    if (staffSheet) {
+      var staffData = staffSheet.getDataRange().getValues();
+      for (var s = 1; s < staffData.length; s++) {
+        var stId = String(staffData[s][0] || "").trim();
+        var stName = String(staffData[s][1] || "").trim();
+        var dispChar = String(staffData[s][7] || "").trim();
+        var resolvedChar = dispChar || (stName ? stName.substring(0, 1) : "");
+        if (stId && resolvedChar) {
+          staffCharById[stId] = resolvedChar;
+        }
+        if (stName && resolvedChar) {
+          staffCharByName[stName] = resolvedChar;
+        }
+      }
+    }
     
     // 1. シフト予定データを取得
     var shiftSheet = ss.getSheetByName("シフト予定");
@@ -2537,10 +2557,11 @@ function getSlackShiftText(yearMonth) {
       var shiftData = shiftSheet.getDataRange().getValues();
       for (var i = 1; i < shiftData.length; i++) {
         var workDate = shiftData[i][1];
+        var staffId = String(shiftData[i][2] || "").trim();
         var staffName = String(shiftData[i][3] || "").trim();
         var dailyMemo = String(shiftData[i][4] || "").replace("||color:yellow", "").replace("||color:blue", "").trim();
         
-        if (!workDate || !staffName) continue;
+        if (!workDate || (!staffId && !staffName)) continue;
         var d = new Date(workDate);
         if (isNaN(d.getTime())) continue;
         
@@ -2551,14 +2572,14 @@ function getSlackShiftText(yearMonth) {
         
         if (dateStr.indexOf(yearMonth) === 0) {
           if (!shiftMap[dateStr]) shiftMap[dateStr] = [];
-          var displayName = dailyMemo ? (staffName + "（" + dailyMemo + "）") : staffName;
+          var labelName = staffCharById[staffId] || staffCharByName[staffName] || staffName;
+          var displayName = dailyMemo ? (labelName + "（" + dailyMemo + "）") : labelName;
           shiftMap[dateStr].push(displayName);
         }
       }
     }
     
     // 2. 1日から末日までループしてスタッフのシフトのみテキストを構築
-    var hasContent = false;
     for (var day = 1; day <= lastDay; day++) {
       var mStr = String(month).padStart(2, '0');
       var dStr = String(day).padStart(2, '0');
@@ -2570,7 +2591,6 @@ function getSlackShiftText(yearMonth) {
       // スタッフのシフトが存在する場合のみ行を出力
       if (shiftMap[dateStr] && shiftMap[dateStr].length > 0) {
         slackText += day + "(" + wStr + ")" + shiftMap[dateStr].join("、") + "\n";
-        hasContent = true;
       }
     }
     

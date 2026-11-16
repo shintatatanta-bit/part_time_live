@@ -996,9 +996,11 @@
       }
 
       function deleteMyKintaiRequest(requestId) {
-        if (!confirm("この申請履歴を本当に削除しますか？")) {
-          return;
-        }
+        // 💡 以下の3行をコメントアウト
+// if (!confirm("この申請履歴を本当に削除しますか？")) {
+//   return;
+// }
+
 
         google.script.run
           .withSuccessHandler(function(res) {
