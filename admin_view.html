@@ -698,20 +698,29 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
       </div> <!-- modal-content の閉じタグ -->
     </div> <!-- staffManagementModal の閉じタグ -->
 
-    <!-- リマインド確認用モーダル -->
+   <!-- 💡 リマインド確認用モーダル（期間選択対応版） -->
     <div id="reminderModal" class="modal-overlay">
-      <div class="modal-content" style="width: 400px; text-align: left;">
-        <h4 style="margin-top: 0;">📢 LINEリマインドの確認・送信</h4>
-        <p style="font-size: 0.8rem; color: var(--text-sub); margin: 6px 0 12px 0;">以下の未提出者を確認し、問題なければ送信ボタンを押してください。</p>
+      <div class="modal-content" style="width: 450px; text-align: left;">
+        <h4 style="margin-top: 0;">📢 未申請リマインドの確認・送信</h4>
+        
+        <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 12px;">
+          <label style="margin-top: 0; color: #1e40af;">対象とする締め期間を選択してください</label>
+          <div style="display: flex; gap: 8px; margin-top: 6px;">
+            <select id="reminderPeriodSelect" onchange="changeReminderPeriod()" style="margin: 0; font-weight: bold; font-size: 0.95rem; color: #1e40af; border-color: #93c5fd; background: #eff6ff;">
+              <!-- Javascriptで自動生成されます -->
+            </select>
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-sub); margin: 6px 0 0 0;">💡 選択した期間内に「シフト予定があるのに未申請」となっているスタッフだけをリストアップします。</p>
+        </div>
         
         <label>送信対象スタッフ一覧:</label>
-        <div id="reminderTargetsBox" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; font-size: 0.8rem; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">
+        <div id="reminderTargetsBox" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; font-size: 0.8rem; background: #fffbeb; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid #f59e0b;">
           読み込み中...
         </div>
 
         <label>メッセージ本文 (編集可能):</label>
-        <textarea id="reminderMessageText" rows="4" style="resize: vertical;">お疲れ様です！
-過去の勤務について、まだ勤怠・交通費の申請が提出されていない日がございます。
+        <textarea id="reminderMessageText" rows="4" style="resize: vertical; font-size: 0.85rem;">お疲れ様です！
+指定期間の勤務について、まだ勤怠・交通費の申請が提出されていない日がございます。
 お手数ですが、スタッフポータルより申請のご入力をお願いいたします！</textarea>
 
         <div class="modal-btns" style="margin-top: 16px;">
@@ -2029,45 +2038,107 @@ html += '</div>';
           .getKintaiPendingStaff();
       }
 
+      // 💡 リマインド関連の変数と関数（期間選択対応版）
       var cachedPendingListForReminder = [];
 
       function openReminderPreview() {
+        var modal = document.getElementById('reminderModal');
+        var select = document.getElementById('reminderPeriodSelect');
         var box = document.getElementById('reminderTargetsBox');
+        
+        modal.style.display = 'flex';
         box.innerHTML = '読み込み中...';
-        document.getElementById('reminderModal').style.display = 'flex';
+        
+        // 💡 プルダウンの選択肢を自動生成（先月後半、今月前半、今月後半）
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = now.getMonth() + 1;
+        var d = now.getDate();
+        
+        var prevM = m === 1 ? 12 : m - 1;
+        var prevY = m === 1 ? y - 1 : y;
+        
+        var prevMonthSecond = prevY + "-" + String(prevM).padStart(2, '0') + "_second";
+        var thisMonthFirst = y + "-" + String(m).padStart(2, '0') + "_first";
+        var thisMonthSecond = y + "-" + String(m).padStart(2, '0') + "_second";
+        
+        var html = '';
+        html += '<option value="">(すべての未申請者)</option>';
+        html += '<option value="' + prevMonthSecond + '">' + prevM + '月 後半 (16日〜末日)</option>';
+        html += '<option value="' + thisMonthFirst + '">' + m + '月 前半 (1日〜15日)</option>';
+        html += '<option value="' + thisMonthSecond + '">' + m + '月 後半 (16日〜末日)</option>';
+        select.innerHTML = html;
+        
+        // 💡 開いたタイミングの日付から、デフォルトで選択状態にする期間を自動判定
+        if (d <= 3) {
+          select.value = prevMonthSecond; // 月初なら先月後半がデフォルト
+        } else if (d > 3 && d <= 18) {
+          select.value = thisMonthFirst;  // 中旬なら今月前半がデフォルト
+        } else {
+          select.value = thisMonthSecond; // 下旬なら今月後半がデフォルト
+        }
+
+        // 初期状態で一度リストを読み込む
+        changeReminderPeriod();
+      }
+
+      function changeReminderPeriod() {
+        var periodKey = document.getElementById('reminderPeriodSelect').value;
+        var box = document.getElementById('reminderTargetsBox');
+        var textArea = document.getElementById('reminderMessageText');
+        box.innerHTML = '<span style="color: var(--text-sub);">リストアップ中...</span>';
+
+        // メッセージ本文の「指定期間」という文字を具体的な期間名に差し替える
+        var select = document.getElementById('reminderPeriodSelect');
+        var periodLabel = select.options[select.selectedIndex].text;
+        var defaultMsg = "お疲れ様です！\n" + (periodKey ? "「" + periodLabel + "」" : "過去") + " の勤務について、まだ勤怠・交通費の申請が提出されていない日がございます。\nお手数ですが、スタッフポータルより申請のご入力をお願いいたします！";
+        textArea.value = defaultMsg;
 
         google.script.run
           .withSuccessHandler(function(res) {
             if (!res.success || res.pendingList.length === 0) {
-              box.innerHTML = '<span style="color: var(--success-color); font-weight: 600;">現在、未提出者はいません。</span>';
+              box.innerHTML = '<span style="color: var(--success-color); font-weight: 600;">この期間に未提出者はいません。🎉</span>';
               cachedPendingListForReminder = [];
               return;
             }
             cachedPendingListForReminder = res.pendingList;
-            var uniqueStaffNames = {};
-            res.pendingList.forEach(function(item) { uniqueStaffNames[item.staffName] = true; });
-            var namesArr = Object.keys(uniqueStaffNames);
+            
+            // 誰がどの日付分を出していないかまとめ直す
+            var staffMap = {};
+            res.pendingList.forEach(function(item) {
+              if (!staffMap[item.staffName]) staffMap[item.staffName] = [];
+              var dateDisplay = Number(item.targetDate.split("-")[1]) + "/" + Number(item.targetDate.split("-")[2]);
+              staffMap[item.staffName].push(dateDisplay);
+            });
 
-            var html = '<ul style="margin: 0; padding-left: 18px;">';
-            namesArr.forEach(function(name) { html += '<li><strong>' + escapeHtml(name) + '</strong> さん</li>'; });
+            var html = '<ul style="margin: 0; padding-left: 18px; color: #92400e; font-size: 0.85rem;">';
+            for (var name in staffMap) {
+              var dates = staffMap[name].join(", ");
+              html += '<li style="margin-bottom: 4px;"><strong>' + escapeHtml(name) + '</strong> さん <span style="font-size: 0.75rem; color: #b45309;">(未申請日: ' + dates + ')</span></li>';
+            }
             html += '</ul>';
             box.innerHTML = html;
           })
-          .getKintaiPendingForReminder();
+          .getKintaiPendingForReminder(periodKey); // 💡 期間キーをサーバーに渡す
       }
 
-      function closeReminderModal() { document.getElementById('reminderModal').style.display = 'none'; }
+      function closeReminderModal() { 
+        document.getElementById('reminderModal').style.display = 'none'; 
+      }
 
       function confirmAndSendReminder() {
         if (cachedPendingListForReminder.length === 0) { alert('送信対象のスタッフがいません。'); closeReminderModal(); return; }
         var messageText = document.getElementById('reminderMessageText').value.trim();
         if (!messageText) { alert('メッセージ本文を入力してください。'); return; }
 
+        var select = document.getElementById('reminderPeriodSelect');
+        var periodLabel = select.options[select.selectedIndex].text;
+
         var uniqueStaffIds = {};
         cachedPendingListForReminder.forEach(function(item) { uniqueStaffIds[item.staffId] = true; });
         var targetsArr = Object.keys(uniqueStaffIds);
 
-        if (!confirm('未提出のスタッフ（' + targetsArr.length + '名）にリマインドLINEを送信しますか？')) return;
+        if (!confirm('リストアップされたスタッフ（' + targetsArr.length + '名）にリマインドLINEを送信しますか？')) return;
 
         var btn = event.target;
         btn.disabled = true;
@@ -2080,7 +2151,11 @@ html += '</div>';
             btn.disabled = false;
             btn.innerText = '🚀 確認して一斉送信';
           })
-          .sendKintaiReminderLine({ targets: targetsArr, messageText: messageText });
+          .sendKintaiReminderLine({ 
+            targets: targetsArr, 
+            messageText: messageText,
+            periodLabel: periodLabel // 💡 履歴用に追加
+          });
       }
 
       function toggleAccordion(cardId) { document.getElementById(cardId).classList.toggle('open'); }

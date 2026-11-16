@@ -1348,12 +1348,32 @@ function getKintaiPendingStaff() {
 }
 
 /**
- * 未提出者リストをLINEリマインド用に詳細情報つきで取得する関数
+ * 💡 未提出者リストをLINEリマインド用に詳細情報つきで取得する関数（期間指定対応版）
  */
-function getKintaiPendingForReminder() {
+function getKintaiPendingForReminder(periodKey) {
   try {
     var res = getKintaiPendingStaff();
     if (!res.success) return res;
+
+    // 💡 指定された期間（例: "2026-11_first"）の開始日と終了日を計算
+    var targetStart = "";
+    var targetEnd = "";
+    if (periodKey) {
+      var parts = periodKey.split("_");
+      var ym = parts[0];
+      var half = parts[1];
+      var y = Number(ym.split("-")[0]);
+      var m = Number(ym.split("-")[1]);
+      
+      if (half === "first") {
+        targetStart = ym + "-01";
+        targetEnd = ym + "-15";
+      } else if (half === "second") {
+        targetStart = ym + "-16";
+        var lastDayObj = new Date(y, m, 0);
+        targetEnd = ym + "-" + String(lastDayObj.getDate()).padStart(2, '0');
+      }
+    }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var staffSheet = ss.getSheetByName("スタッフマスタ");
@@ -1373,7 +1393,15 @@ function getKintaiPendingForReminder() {
     var validPendingList = [];
     res.pendingList.forEach(function(item) {
       if (staffLineMap[item.staffId]) {
-        validPendingList.push(item);
+        // 💡 期間が指定されている場合、その期間内の未提出データのみを拾う
+        if (targetStart && targetEnd) {
+          if (item.targetDate >= targetStart && item.targetDate <= targetEnd) {
+            validPendingList.push(item);
+          }
+        } else {
+          // 期間指定なしの場合はすべて（従来の動作）
+          validPendingList.push(item);
+        }
       }
     });
 
@@ -1384,12 +1412,13 @@ function getKintaiPendingForReminder() {
 }
 
 /**
- * 未提出者へリマインドLINEを送信する関数
+ * 💡 未提出者へリマインドLINEを送信する関数（期間ラベル付き）
  */
 function sendKintaiReminderLine(data) {
   try {
     var targets = data.targets || [];
     var messageText = data.messageText;
+    var periodLabel = data.periodLabel || "過去の勤務"; // 💡 追加：どの期間のリマインドか
 
     if (targets.length === 0) {
       return { success: false, message: "送信対象のスタッフが選択されていません。" };
@@ -1478,7 +1507,8 @@ function sendKintaiReminderLine(data) {
 
     var historyId = "hist_" + Utilities.getUuid().substring(0, 8);
     var timestamp = new Date();
-    var targetNameDisplay = "【勤怠リマインド】" + targetNames.join(", ");
+    // 💡 履歴にもどの期間か残す
+    var targetNameDisplay = "【" + periodLabel + " 勤怠リマインド】" + targetNames.join(", ");
     var resultStr = "成功: " + successCount + "件 / 失敗: " + failCount + "件";
 
     histSheet.appendRow([historyId, timestamp, targetNameDisplay, messageText, resultStr]);
