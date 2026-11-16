@@ -910,7 +910,8 @@
         var ym = document.getElementById('staffClosingMonth').value;
         var half = document.getElementById('staffClosingHalf').value;
 
-        if (!confirm('この期間の勤務内容に間違いありませんか？\n確定すると報告され、内容がロックされます。')) return;
+// 💡 以下の1行をコメントアウトして無効化します
+// if (!confirm('この期間の勤務内容に間違いありませんか？\n確定すると報告され、内容がロックされます。')) return;
 
         google.script.run
           .withSuccessHandler(function(res) {
