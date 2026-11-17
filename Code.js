@@ -412,7 +412,8 @@ function registerNewStaff(formData) {
     
     // 💡 通常のWebアプリURLベースで個別URLを発行する
     var webAppUrl = ScriptApp.getService().getUrl();
-    var staffUrl = webAppUrl + "?page=staff&staffId=" + staffId;
+    // ▼ この行の末尾に "&openExternalBrowser=1" を追加
+    var staffUrl = webAppUrl + "?page=staff&staffId=" + staffId + "&openExternalBrowser=1";
     
     sheet.appendRow([
       staffId,
@@ -452,9 +453,16 @@ function getStaffList() {
       if (row[0]) {
         var staffName = String(row[1] || "").trim();
         
+        // ... 前半省略 ...
         // 💡 【追加】スタッフ名に「テスト」が含まれている場合はダッシュボードに表示しない
         if (staffName.indexOf("テスト") !== -1) {
           continue; 
+        }
+
+        // ▼ URLを取得し、末尾にパラメーターが付いていなければ付け足す
+        var baseStaffUrl = row[6] || "";
+        if (baseStaffUrl && baseStaffUrl.indexOf("openExternalBrowser=1") === -1) {
+           baseStaffUrl += "&openExternalBrowser=1";
         }
 
         staffList.push({
@@ -463,12 +471,13 @@ function getStaffList() {
           lineUserId: row[2],
           assignedAccount: row[3],
           status: row[4],
-          staffUrl: row[6] || "",
+          staffUrl: baseStaffUrl, // 👈 修正したURLをセット
           displayChar: row[7] || staffName.substring(0, 1)
         });
       }
     }
     return staffList;
+    
   } catch (error) {
     Logger.log("スタッフ一覧取得エラー: " + error.message);
     return [];
@@ -1659,8 +1668,10 @@ if (activeCount >= maxLimit) {
     
     var staffId = "st_" + Utilities.getUuid().substring(0, 6);
     var timestamp = new Date();
+    // 💡 通常のWebアプリURLベースで個別URLを発行する
     var webAppUrl = ScriptApp.getService().getUrl();
-    var staffUrl = webAppUrl + "?page=staff&staffId=" + staffId;
+    // ▼ この行の末尾に "&openExternalBrowser=1" を追加
+    var staffUrl = webAppUrl + "?page=staff&staffId=" + staffId + "&openExternalBrowser=1";
     
     sheet.appendRow([
       staffId,
