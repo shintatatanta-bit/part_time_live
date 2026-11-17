@@ -1860,8 +1860,17 @@ html += '</div>';
 
               // 全体合計の表示を更新（給与総額も含める）
               if (grandTotal) {
-                document.getElementById('grandTotalText').innerText = 
-                  '労働合計: ' + grandTotal.totalWorkHoursStr + ' ／ 給与総額合計: ¥' + grandTotalSalary.toLocaleString() + ' ／ 交通費合計: ¥' + gTotalCost.toLocaleString();
+                // 💡 交通費の税込実費を1.1で割り戻して税抜金額にする（四捨五入）
+                var taxExcludedTransport = Math.round(gTotalCost / 1.1);
+                // 💡 給与総額と税抜交通費を足して、指定期間の総合計（税抜）を出す
+                var grandTotalExcludingTax = grandTotalSalary + taxExcludedTransport;
+
+                document.getElementById('grandTotalText').innerHTML = 
+                  '労働合計: ' + grandTotal.totalWorkHoursStr + 
+                  ' ／ 給与総額合計: ¥' + grandTotalSalary.toLocaleString() + 
+                  ' ／ 交通費合計 (税抜): ¥' + taxExcludedTransport.toLocaleString() + 
+                  ' <span style="margin-left:12px; padding-left:12px; border-left:2px solid #93c5fd; color:#b45309; font-weight:bold; font-size:1.05em;">総合計 (税抜): ¥' + grandTotalExcludingTax.toLocaleString() + '</span>';
+                
                 totalBox.style.display = 'block';
               }
             }
