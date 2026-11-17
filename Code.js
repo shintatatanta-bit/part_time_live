@@ -544,9 +544,9 @@ function getKintaiSummary(startDate, endDate) {
     if (!dataSheet) return { success: false, message: "申請データシートが見つかりません" };
     var kintaiData = dataSheet.getDataRange().getValues();
     
-    var start = startDate ? new Date(startDate) : new Date("2000-01-01");
-    var end = endDate ? new Date(endDate) : new Date("2100-12-31");
-    end.setHours(23, 59, 59, 999);
+    // 💡 比較用：開始日と終了日を確実に「その日の0時0分0秒」と「23時59分59秒」のタイムスタンプ（数値）にする
+    var start = startDate ? new Date(startDate + "T00:00:00+09:00").getTime() : new Date("2000-01-01T00:00:00+09:00").getTime();
+    var end = endDate ? new Date(endDate + "T23:59:59+09:00").getTime() : new Date("2100-12-31T23:59:59+09:00").getTime();
     
     var weekDays = ["日", "月", "火", "水", "木", "金", "土"];
     
@@ -558,18 +558,39 @@ function getKintaiSummary(startDate, endDate) {
       var row = kintaiData[j];
       var reqId = row[0];
       var sId = row[1];
-      var workDateStr = row[3];
+      var workDateRaw = row[3];
       var startTime = row[4];
       var endTime = row[5];
       var breakMins = Number(row[6]) || 0;
       var cost = Number(row[7]) || 0;
       
-      if (!reqId || !sId || !workDateStr) continue;
+      if (!reqId || !sId || !workDateRaw) continue;
       
-      var workDate = new Date(workDateStr);
-      if (isNaN(workDate.getTime())) continue;
+      // 💡 申請データの日付を安全にタイムスタンプ（数値）に変換する
+      var workDateStr = "";
+      if (workDateRaw instanceof Date) {
+        workDateStr = Utilities.formatDate(workDateRaw, "Asia/Tokyo", "yyyy-MM-dd");
+      } else {
+        var str = String(workDateRaw).trim();
+        if (str.length >= 10 && str.indexOf("-") !== -1) {
+          workDateStr = str.substring(0, 10);
+        } else {
+          var d = new Date(workDateRaw);
+          if (!isNaN(d.getTime())) {
+            workDateStr = Utilities.formatDate(d, "Asia/Tokyo", "yyyy-MM-dd");
+          } else {
+            workDateStr = str;
+          }
+        }
+      }
       
-      if (workDate >= start && workDate <= end) {
+      var workDateObj = new Date(workDateStr + "T12:00:00+09:00"); // 比較のブレを防ぐため正午とする
+      var workTime = workDateObj.getTime();
+      
+      if (isNaN(workTime)) continue;
+      
+      // 💡 タイムスタンプ（数値）同士で、指定期間に収まっているかを判定
+      if (workTime >= start && workTime <= end) {
         if (staffMap[sId]) {
           staffMap[sId].daysCount += 1;
           staffMap[sId].totalCost += cost;
@@ -593,9 +614,9 @@ function getKintaiSummary(startDate, endDate) {
             }
           }
           
-          var m = ('0' + (workDate.getMonth() + 1)).slice(-2);
-          var d = ('0' + workDate.getDate()).slice(-2);
-          var dayOfWeek = weekDays[workDate.getDay()];
+          var m = ('0' + (workDateObj.getMonth() + 1)).slice(-2);
+          var d = ('0' + workDateObj.getDate()).slice(-2);
+          var dayOfWeek = weekDays[workDateObj.getDay()];
           var formattedDate = m + '/' + d + '(' + dayOfWeek + ')';
           
           staffMap[sId].records.push({
