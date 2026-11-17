@@ -453,7 +453,6 @@ function getStaffList() {
       if (row[0]) {
         var staffName = String(row[1] || "").trim();
         
-        // ... 前半省略 ...
         // 💡 【追加】スタッフ名に「テスト」が含まれている場合はダッシュボードに表示しない
         if (staffName.indexOf("テスト") !== -1) {
           continue; 
@@ -477,7 +476,6 @@ function getStaffList() {
       }
     }
     return staffList;
-    
   } catch (error) {
     Logger.log("スタッフ一覧取得エラー: " + error.message);
     return [];
