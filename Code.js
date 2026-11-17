@@ -3757,3 +3757,215 @@ function getMonthlyPaymentSummary(yearMonth) {
     return { success: false, message: error.message };
   }
 }
+
+/**
+ * 💡 請求書発行用：指定期間の全スタッフの時給別合計時間を集計する関数
+ */
+function getInvoiceSummaryData(yearMonth, half) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 対象期間の算出
+    var parts = yearMonth.split('-');
+    var year = Number(parts[0]);
+    var month = Number(parts[1]);
+    var startDateStr = half === "first" ? yearMonth + "-01" : yearMonth + "-16";
+    var endDateStr = half === "first" ? yearMonth + "-15" : yearMonth + "-" + String(new Date(year, month, 0).getDate()).padStart(2, '0');
+    var start = new Date(startDateStr + "T00:00:00+09:00").getTime();
+    var end = new Date(endDateStr + "T23:59:59+09:00").getTime();
+
+    var dataSheet = ss.getSheetByName("申請データ");
+    if (!dataSheet) throw new Error("申請データが見つかりません。");
+    var kData = dataSheet.getDataRange().getValues();
+
+    // 時給ごとの集計箱と交通費
+    var wageSummary = {};
+    var totalTransportCost = 0;
+
+    // ヘルパー：日付文字列からタイムスタンプ取得
+    function getSafeTime(rawDate) {
+      if (!rawDate) return 0;
+      if (rawDate instanceof Date) return new Date(Utilities.formatDate(rawDate, "Asia/Tokyo", "yyyy-MM-dd") + "T12:00:00+09:00").getTime();
+      var str = String(rawDate).trim();
+      var d = (str.length >= 10 && str.indexOf("-") !== -1) ? str.substring(0, 10) : Utilities.formatDate(new Date(rawDate), "Asia/Tokyo", "yyyy-MM-dd");
+      return new Date(d + "T12:00:00+09:00").getTime();
+    }
+
+    // 各申請行をループして集計
+    for (var k = 1; k < kData.length; k++) {
+      var staffId = String(kData[k][1]).trim();
+      var workTime = getSafeTime(kData[k][3]);
+      
+      if (workTime >= start && workTime <= end) {
+        var cost = Number(kData[k][7]) || 0;
+        totalTransportCost += cost;
+
+        var sParts = formatTime(kData[k][4]).split(":");
+        var eParts = formatTime(kData[k][5]).split(":");
+        var breakMins = Number(kData[k][6]) || 0;
+        
+        if (sParts.length === 2 && eParts.length === 2) {
+          var workMins = ((Number(eParts[0]) * 60 + Number(eParts[1])) - (Number(sParts[0]) * 60 + Number(sParts[1]))) - breakMins;
+          if (workMins > 0) {
+            var wage = getEffectiveHourlyWage(staffId, yearMonth, half); // 各スタッフの適用時給を取得
+            if (!wageSummary[wage]) wageSummary[wage] = 0;
+            wageSummary[wage] += workMins;
+          }
+        }
+      }
+    }
+
+    // 画面表示用・転記用にデータを整形
+    var resultList = [];
+    var totalLaborCost = 0;
+    for (var w in wageSummary) {
+      var wageNum = Number(w);
+      var totalMins = wageSummary[w];
+      var hoursStr = Math.floor(totalMins / 60) + ":" + String(totalMins % 60).padStart(2, '0');
+      var amount = Math.round((totalMins / 60) * wageNum);
+      totalLaborCost += amount;
+      
+      resultList.push({
+        wage: wageNum,
+        hoursStr: hoursStr,
+        amount: amount
+      });
+    }
+
+    // 時給の安い順に並び替え
+    resultList.sort(function(a, b) { return a.wage - b.wage; });
+
+    // スプレッドシート側の税計算ルールに合わせてプレビュー用数値を算出
+    var subtotal = totalLaborCost + totalTransportCost;
+    var tax = Math.floor(subtotal * 0.10); // テンプレートに合わせて切り捨て（必要に応じて変更可）
+    var grandTotal = subtotal + tax;
+
+    var periodDisplay = year + "年" + month + "月" + (half === "first" ? "1日〜15日分" : "16日〜" + new Date(year, month, 0).getDate() + "日分");
+
+    return {
+      success: true,
+      periodDisplay: periodDisplay,
+      periodKey: yearMonth + "_" + half,
+      details: resultList,
+      totalTransportCost: totalTransportCost,
+      subtotal: subtotal,
+      tax: tax,
+      grandTotal: grandTotal
+    };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * 💡 テンプレートに転記しPDFを生成・ダウンロードURLを返す関数（ドライブ保存なし版・振込期日自動計算付き）
+ */
+function generateInvoicePdf(summaryData) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var templateSheet = ss.getSheetByName("請求書テンプレート");
+    if (!templateSheet) throw new Error("「請求書テンプレート」シートが見つかりません。");
+
+    // 1. テンプレートをコピーして作業用シートを作成
+    var workSheet = templateSheet.copyTo(ss);
+    var workSheetName = "Invoice_" + summaryData.periodKey + "_" + Utilities.getUuid().substring(0, 6);
+    workSheet.setName(workSheetName);
+
+    // 2. データの転記 (対象期間と交通費)
+    workSheet.getRange("B8").setValue("対象期間：" + summaryData.periodDisplay);
+    workSheet.getRange("I23").setValue(summaryData.totalTransportCost);
+
+    // 3. テンプレートの17行目〜22行目に時給ごとのデータを流し込む
+    var targetRows = { 1280: 17, 1300: 18, 1350: 19, 1400: 20, 1450: 21, 1500: 22 }; 
+    
+    // 一旦F17:F22を "0:00" にリセットし、I17:I22の金額を0にする
+    for (var row = 17; row <= 22; row++) {
+      workSheet.getRange("F" + row).setValue("0:00");
+      workSheet.getRange("I" + row).setValue(0);
+    }
+
+    summaryData.details.forEach(function(item) {
+      var r = targetRows[item.wage];
+      if (r) {
+        workSheet.getRange("F" + r).setValue("'" + item.hoursStr);
+        workSheet.getRange("I" + r).setValue(item.amount);
+      }
+    });
+
+    // 4. お振込期日の計算と転記 💡ここを追加！
+    // summaryData.periodKey は "2026-11_first" のような形式
+    var parts = summaryData.periodKey.split("_");
+    var ymParts = parts[0].split("-");
+    var year = Number(ymParts[0]);
+    var month = Number(ymParts[1]);
+    var half = parts[1]; // "first" または "second"
+
+    var dueDateDisplay = "";
+    if (half === "first") {
+      // 15日締め → その月の末日
+      var lastDay = new Date(year, month, 0).getDate();
+      dueDateDisplay = year + "年" + month + "月" + lastDay + "日";
+    } else {
+      // 末日締め → 翌月15日
+      var nextMonthDate = new Date(year, month, 15); // monthは0始まりではないので注意（JavaScriptのDateの仕様を考慮）
+      // Dateオブジェクトを使うと月またぎ・年またぎが自動処理される安全な方法
+      var safeDate = new Date(year, month - 1 + 1, 15); // 当月(month-1)の翌月(+1)
+      dueDateDisplay = safeDate.getFullYear() + "年" + (safeDate.getMonth() + 1) + "月15日";
+    }
+    
+    // 💡 振込期日を書き込むセル番地（仮にC46セルとしています。テンプレートに合わせて変更してください）
+    workSheet.getRange("C46").setValue("お振込期日：" + dueDateDisplay);
+
+    SpreadsheetApp.flush(); // 計算を確定させる
+
+    // 5. PDFエクスポート (ドライブ保存なし)
+    var fileName = "請求書_" + summaryData.periodDisplay;
+    
+    var url = "https://docs.google.com/spreadsheets/d/" + ss.getId() + "/export?";
+    var options = {
+      exportFormat: "pdf",
+      format: "pdf",
+      size: "A4",
+      portrait: "true",
+      fitw: "true",
+      gridlines: "false",
+      printtitle: "false",
+      sheetnames: "false",
+      gid: workSheet.getSheetId()
+    };
+    
+    var urlParts = [];
+    for (var key in options) { urlParts.push(key + "=" + options[key]); }
+    var exportUrl = url + urlParts.join("&");
+    
+    var response = UrlFetchApp.fetch(exportUrl, {
+      headers: { "Authorization": "Bearer " + ScriptApp.getOAuthToken(), "MuteHttpExceptions": true }
+    });
+    
+    var blob = response.getBlob().setName(fileName + ".pdf");
+
+    // 6. 履歴への記録 (リンクの代わりにダウンロード済と記載)
+    var histSheet = ss.getSheetByName("請求書発行履歴");
+    if (!histSheet) {
+      histSheet = ss.insertSheet("請求書発行履歴");
+      histSheet.appendRow(["発行日時", "対象期間", "請求総額", "ステータス"]);
+    }
+    histSheet.appendRow([new Date(), summaryData.periodDisplay, summaryData.grandTotal, "ダウンロード済"]);
+
+    // 7. 作業用シートの削除
+    ss.deleteSheet(workSheet);
+
+    // HTML側にBase64でPDFデータを返し、ブラウザに直接ダウンロードさせる
+    return {
+      success: true,
+      base64: Utilities.base64Encode(blob.getBytes()),
+      fileName: fileName + ".pdf",
+      mimeType: "application/pdf",
+      message: "請求書を発行しました！（パソコンに直接ダウンロードされます）"
+    };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}

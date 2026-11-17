@@ -410,13 +410,19 @@ overflow: visible !important; /* 👈 スティッキーが隠れたり途切れ
     <div class="header-container">
       <h2>🛠️ ダッシュボード</h2>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <!-- 📄 請求書一括発行ボタン（目立たせるためにオレンジ色） -->
+        <button type="button" class="secondary" style="background: #d97706; color: #fff; border: none; padding: 8px 16px; font-weight: bold; box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2);" onclick="openInvoiceModal()">📄 請求書を発行</button>
+
         <!-- 💰 時給設定ボタン -->
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openWageModal()">💰 時給設定</button>
         
-        <!-- 💸 【追加】月の支払額一覧ボタン -->
+        <!-- 💸 月の支払額一覧ボタン（重複を解消して1つに） -->
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openPaymentModal()">💸 月の支払額一覧</button>
         
+        <!-- 🔒 締め作業・確認 -->
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openClosingModal()">🔒 締め作業・確認</button>
+        
+        <!-- ⚙️ スタッフ管理 -->
         <button type="button" class="secondary" style="background: #0f172a; color: #fff; border: none; padding: 8px 16px;" onclick="openStaffModal()">⚙️ スタッフ管理</button>
       </div>
     </div>
@@ -3189,7 +3195,205 @@ var draggedSourceDate = null;
           })
           .getMonthlyPaymentSummary(ym);
       }
-
+      
     </script>
-  </body>
+<!-- 📄 請求書発行 モーダルポップアップ -->
+<div id="invoiceModal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 600px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px;">
+      <h4 style="margin: 0;">📄 請求書の一括発行（PDF）</h4>
+      <button type="button" class="secondary" onclick="closeInvoiceModal()">✕ 閉じる</button>
+    </div>
+
+    <p style="font-size: 0.8rem; color: var(--text-sub); margin-top: 0;">
+      対象期間を選択して「プレビュー」を押すと、時給ごとの合計時間と金額が計算されます。<br>
+      内容に間違いがなければ、PDFを発行してください。
+    </p>
+    
+    <div class="flex-row" style="align-items: flex-end; gap: 10px; margin-bottom: 16px;">
+      <div class="flex-col">
+        <label>対象月</label>
+        <input type="month" id="invoiceMonthInput" style="margin-top:4px;">
+      </div>
+      <div class="flex-col">
+        <label>対象期間（半期）</label>
+        <select id="invoiceHalfInput" style="margin-top:4px;">
+          <option value="first">前半 (1日 〜 15日)</option>
+          <option value="second">後半 (16日 〜 末日)</option>
+        </select>
+      </div>
+      <button type="button" class="secondary" style="margin-bottom:0;" onclick="previewInvoiceData()">🔄 プレビュー</button>
+    </div>
+
+    <!-- プレビュー結果表示エリア -->
+    <div id="invoicePreviewBox" style="display:none; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; margin-bottom: 16px;">
+      <div style="background: #f8fafc; padding: 10px 14px; border-bottom: 1px solid var(--border-color); font-weight: bold; font-size: 0.9rem; color: var(--accent-color);">
+        🔍 <span id="invoicePreviewPeriodText"></span> の集計結果
+      </div>
+      
+      <table style="margin-top:0; border:none; font-size: 0.85rem;">
+        <thead>
+          <tr>
+            <th style="border-left:none; border-right:none; width:120px;">適用時給</th>
+            <th style="border-left:none; border-right:none; text-align:right;">合計時間</th>
+            <th style="border-left:none; border-right:none; text-align:right;">小計金額</th>
+          </tr>
+        </thead>
+        <tbody id="invoicePreviewTableBody">
+        </tbody>
+      </table>
+
+      <div style="padding: 14px; background: #fffbeb; border-top: 1px solid #fde68a;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.85rem; color: #b45309;">
+          <span>交通費合計:</span> <span id="invoicePreviewTransport">¥0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.85rem; color: #b45309;">
+          <span>小計 (税抜):</span> <span id="invoicePreviewSubtotal">¥0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: #b45309;">
+          <span>消費税 (10%):</span> <span id="invoicePreviewTax">¥0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #fcd34d; padding-top: 8px; font-weight: bold; font-size: 1.1rem; color: #d97706;">
+          <span>請求総額 (税込):</span> <span id="invoicePreviewGrandTotal">¥0</span>
+        </div>
+      </div>
+    </div>
+    
+    <div id="invoiceLoadingMsg" style="display:none; text-align:center; padding: 20px; color: var(--text-sub); font-size: 0.85rem;">計算中...</div>
+
+    <div class="modal-btns">
+      <button type="button" id="invoiceGenerateBtn" style="background: var(--success-color);" onclick="executeInvoiceGeneration()" disabled>🚀 この内容で請求書（PDF）を作成する</button>
+      <button type="button" class="secondary" style="width: 100%; text-align: center;" onclick="closeInvoiceModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 💡 請求書発行用のスクリプト
+  var cachedInvoiceSummary = null;
+
+  function openInvoiceModal() {
+    document.getElementById('invoiceModal').style.display = 'flex';
+    var now = new Date();
+    var y = now.getFullYear();
+    var m = String(now.getMonth() + 1).padStart(2, '0');
+    var d = now.getDate();
+    
+    document.getElementById('invoiceMonthInput').value = y + '-' + m;
+    document.getElementById('invoiceHalfInput').value = d <= 15 ? 'first' : 'second';
+    
+    document.getElementById('invoicePreviewBox').style.display = 'none';
+    document.getElementById('invoiceGenerateBtn').disabled = true;
+    cachedInvoiceSummary = null;
+  }
+
+  function closeInvoiceModal() {
+    document.getElementById('invoiceModal').style.display = 'none';
+  }
+
+  function previewInvoiceData() {
+    var ym = document.getElementById('invoiceMonthInput').value;
+    var half = document.getElementById('invoiceHalfInput').value;
+    
+    if (!ym) return;
+
+    document.getElementById('invoicePreviewBox').style.display = 'none';
+    document.getElementById('invoiceLoadingMsg').style.display = 'block';
+    document.getElementById('invoiceGenerateBtn').disabled = true;
+    cachedInvoiceSummary = null;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        document.getElementById('invoiceLoadingMsg').style.display = 'none';
+        
+        if (!res.success) {
+          alert("エラー: " + res.message);
+          return;
+        }
+
+        cachedInvoiceSummary = res; // データを保持しておく
+
+        document.getElementById('invoicePreviewPeriodText').innerText = res.periodDisplay;
+        
+        var tbody = document.getElementById('invoicePreviewTableBody');
+        var html = '';
+        if (res.details.length === 0) {
+          html = '<tr><td colspan="3" style="text-align:center; color:#94a3b8; border:none; padding:12px;">この期間の労働実績はありません</td></tr>';
+        } else {
+          res.details.forEach(function(d) {
+            html += '<tr>';
+            html += '<td style="border-left:none; border-right:none;">¥' + d.wage.toLocaleString() + ' /時間</td>';
+            html += '<td style="text-align:right; border-left:none; border-right:none;">' + d.hoursStr + '</td>';
+            html += '<td style="text-align:right; border-left:none; border-right:none;">¥' + d.amount.toLocaleString() + '</td>';
+            html += '</tr>';
+          });
+        }
+        tbody.innerHTML = html;
+
+        document.getElementById('invoicePreviewTransport').innerText = '¥' + res.totalTransportCost.toLocaleString();
+        document.getElementById('invoicePreviewSubtotal').innerText = '¥' + res.subtotal.toLocaleString();
+        document.getElementById('invoicePreviewTax').innerText = '¥' + res.tax.toLocaleString();
+        document.getElementById('invoicePreviewGrandTotal').innerText = '¥' + res.grandTotal.toLocaleString();
+
+        document.getElementById('invoicePreviewBox').style.display = 'block';
+        
+        // 実績がある場合のみ発行ボタンを有効化
+        if (res.details.length > 0) {
+          document.getElementById('invoiceGenerateBtn').disabled = false;
+        }
+      })
+      .withFailureHandler(function(err) {
+        document.getElementById('invoiceLoadingMsg').style.display = 'none';
+        alert('通信エラー: ' + err.message);
+      })
+      .getInvoiceSummaryData(ym, half);
+  }
+
+  function executeInvoiceGeneration() {
+    if (!cachedInvoiceSummary) return;
+
+    var btn = document.getElementById('invoiceGenerateBtn');
+    var originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = 'PDF作成中... 少々お待ちください';
+
+    showToast('請求書を生成しています...', true);
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          // Base64データからPDFを作成してダウンロードさせる
+          var byteCharacters = atob(res.base64);
+          var byteNumbers = new Array(byteCharacters.length);
+          for (var i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          var byteArray = new Uint8Array(byteNumbers);
+          var blob = new Blob([byteArray], { type: res.mimeType });
+          
+          var link = document.createElement('a');
+          link.href = window.URL.createObjectURL(blob);
+          link.download = res.fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          showToast(res.message, true);
+          closeInvoiceModal();
+        } else {
+          alert('PDF作成失敗: ' + res.message);
+        }
+        btn.disabled = false;
+        btn.innerText = originalText;
+      })
+      .withFailureHandler(function(err) {
+        alert('通信エラー: ' + err.message);
+        btn.disabled = false;
+        btn.innerText = originalText;
+      })
+      .generateInvoicePdf(cachedInvoiceSummary);
+  }
+</script>  
+
+</body>
 </html>
