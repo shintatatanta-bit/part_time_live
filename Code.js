@@ -3759,7 +3759,7 @@ function getMonthlyPaymentSummary(yearMonth) {
 }
 
 /**
- * 💡 請求書発行用：指定期間の全スタッフの時給別合計時間を集計する関数
+ * 💡 請求書発行用：指定期間の全スタッフの時給別合計時間を集計する関数（交通費の税抜逆算対応版）
  */
 function getInvoiceSummaryData(yearMonth, half) {
   try {
@@ -3780,7 +3780,7 @@ function getInvoiceSummaryData(yearMonth, half) {
 
     // 時給ごとの集計箱と交通費
     var wageSummary = {};
-    var totalTransportCost = 0;
+    var rawTransportCost = 0; // 💡 税込の交通費実費を集計する箱
 
     // ヘルパー：日付文字列からタイムスタンプ取得
     function getSafeTime(rawDate) {
@@ -3798,7 +3798,7 @@ function getInvoiceSummaryData(yearMonth, half) {
       
       if (workTime >= start && workTime <= end) {
         var cost = Number(kData[k][7]) || 0;
-        totalTransportCost += cost;
+        rawTransportCost += cost;
 
         var sParts = formatTime(kData[k][4]).split(":");
         var eParts = formatTime(kData[k][5]).split(":");
@@ -3835,9 +3835,13 @@ function getInvoiceSummaryData(yearMonth, half) {
     // 時給の安い順に並び替え
     resultList.sort(function(a, b) { return a.wage - b.wage; });
 
+    // 💡 【重要な修正】申請された交通費（税込）から、消費税分を逆算して「税抜金額」にする
+    // 例：申請された交通費合計が 3,710円 の場合、 3710 ÷ 1.1 = 3372.72... → 四捨五入して 3373円
+    var taxExcludedTransportCost = Math.round(rawTransportCost / 1.1);
+
     // スプレッドシート側の税計算ルールに合わせてプレビュー用数値を算出
-    var subtotal = totalLaborCost + totalTransportCost;
-    var tax = Math.floor(subtotal * 0.10); // テンプレートに合わせて切り捨て（必要に応じて変更可）
+    var subtotal = totalLaborCost + taxExcludedTransportCost; // 💡 税抜交通費を足す
+    var tax = Math.floor(subtotal * 0.10); // テンプレートに合わせて切り捨て
     var grandTotal = subtotal + tax;
 
     var periodDisplay = year + "年" + month + "月" + (half === "first" ? "1日〜15日分" : "16日〜" + new Date(year, month, 0).getDate() + "日分");
@@ -3847,7 +3851,7 @@ function getInvoiceSummaryData(yearMonth, half) {
       periodDisplay: periodDisplay,
       periodKey: yearMonth + "_" + half,
       details: resultList,
-      totalTransportCost: totalTransportCost,
+      totalTransportCost: taxExcludedTransportCost, // 💡 税抜金額を明細・プレビューに渡す
       subtotal: subtotal,
       tax: tax,
       grandTotal: grandTotal
