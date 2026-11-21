@@ -1793,17 +1793,26 @@ html += '</div>';
         return { yearMonth: ym, half: half, periodKey: ym + '_' + half };
       }
 
-      // 💰 時給を反映して集計カードを描画する関数（カード内の個別時給設定を削除）
+      // 💰 時給を反映して集計カードを描画する関数（製造・レストラン別合計＆日別区分切替対応版）
       function renderSummaryCardsWithWages(staffSummaryList, periodInfo, grandTotal, container, totalBox) {
+        // 再描画前に開いているカードのIDを記憶しておく
+        var openedCardIds = [];
+        document.querySelectorAll('.staff-card.open').forEach(function(el) {
+          openedCardIds.push(el.id);
+        });
+
         var completedCount = 0;
         var grandTotalSalary = 0;
+        var grandMfgSalary = 0;
+        var grandRestSalary = 0;
         var processedData = [];
 
         staffSummaryList.forEach(function(item, idx) {
           google.script.run.withSuccessHandler(function(wage) {
-            // 労働時間（分）から時間（小数点あり）を計算して給与を算出
             var totalHours = item.totalWorkMinutes / 60;
             var estimatedSalary = Math.round(totalHours * wage);
+            var mfgSalary = Math.round((item.mfgWorkMinutes / 60) * wage);
+            var restSalary = Math.round((item.restWorkMinutes / 60) * wage);
             
             processedData[idx] = {
               item: item,
@@ -1812,25 +1821,33 @@ html += '</div>';
             };
 
             grandTotalSalary += estimatedSalary;
+            grandMfgSalary += mfgSalary;
+            grandRestSalary += restSalary;
             completedCount++;
 
             if (completedCount === staffSummaryList.length) {
               var html = '';
-              var gTotalWorkMins = 0;
               var gTotalCost = 0;
 
               processedData.forEach(function(data) {
                 var item = data.item;
                 var wage = data.wage;
                 var salary = data.salary;
+                var cardId = 'card-' + item.staffId;
+                var isOpenClass = openedCardIds.indexOf(cardId) !== -1 ? ' open' : '';
                 
                 gTotalCost += item.totalCost;
 
-                html += '<div class="staff-card" id="card-' + item.staffId + '">';
-                html += '<div class="staff-header" onclick="toggleCard(\'card-' + item.staffId + '\')">';
+                // レストラン勤務が含まれるスタッフにはバッジ表示
+                var restTag = item.restWorkMinutes > 0
+                  ? '<span style="background:#fef3c7; color:#b45309; font-size:0.7rem; padding:2px 6px; border-radius:4px; margin-left:6px; font-weight:600;">🍽️ レストランあり</span>'
+                  : '';
+
+                html += '<div class="staff-card' + isOpenClass + '" id="' + cardId + '">';
+                html += '<div class="staff-header" onclick="toggleCard(\'' + cardId + '\')">';
                 
                 html += '<div class="staff-info">';
-                html += '<h4>' + escapeHtml(item.staffName) + ' (' + escapeHtml(item.assignedAccount) + ') <span id="staff-alert-' + item.staffId + '"></span></h4>';
+                html += '<h4>' + escapeHtml(item.staffName) + ' (' + escapeHtml(item.assignedAccount) + ')' + restTag + ' <span id="staff-alert-' + item.staffId + '"></span></h4>';
                 html += '<p>勤務日数: ' + item.daysCount + '日 / 労働合計: <strong>' + item.totalWorkHoursStr + '</strong></p>';
                 html += '</div>';
                 
@@ -1840,14 +1857,26 @@ html += '</div>';
                 html += '<div style="font-size: 0.7rem; color: var(--text-sub); margin-top:2px;">詳細 ▼</div>';
                 html += '</div></div>';
 
-                // 💡 カード内の個別時給設定ボックスは削除し、申請明細テーブルのみをすっきりと配置
                 html += '<div class="staff-details">';
                 if (item.records.length === 0) {
                   html += '<p style="font-size:0.8rem; color:var(--text-sub); text-align:center; margin:8px 0;">この期間の申請データはありません</p>';
                 } else {
-                  html += '<table><thead><tr><th>勤務日</th><th>時間</th><th>休憩</th><th>交通費</th></tr></thead><tbody>';
+                  html += '<table><thead><tr><th>勤務日</th><th>時間</th><th>休憩</th><th>交通費</th><th style="width:110px; text-align:center;">請求区分</th></tr></thead><tbody>';
                   item.records.forEach(function(rec) {
-                    html += '<tr><td>' + rec.workDate + '</td><td>' + rec.startTime + ' 〜 ' + rec.endTime + '</td><td>' + rec.breakTime + '分</td><td>¥' + rec.transportCost.toLocaleString() + '</td></tr>';
+                    var isRest = (rec.category === 'レストラン');
+                    var selectBg = isRest ? 'background:#fef3c7; color:#b45309; border-color:#f59e0b; font-weight:bold;' : 'background:#f8fafc; color:#334155;';
+                    html += '<tr>';
+                    html += '<td>' + rec.workDate + '</td>';
+                    html += '<td>' + rec.startTime + ' 〜 ' + rec.endTime + '</td>';
+                    html += '<td>' + rec.breakTime + '分</td>';
+                    html += '<td>¥' + rec.transportCost.toLocaleString() + '</td>';
+                    html += '<td style="text-align:center; padding:4px;">';
+                    html += '<select style="margin:0; padding:4px 6px; font-size:0.75rem; ' + selectBg + '" onchange="changeKintaiCategory(\'' + rec.requestId + '\', this.value, this)">';
+                    html += '<option value="製造"' + (!isRest ? ' selected' : '') + '>製造</option>';
+                    html += '<option value="レストラン"' + (isRest ? ' selected' : '') + '>レストラン</option>';
+                    html += '</select>';
+                    html += '</td>';
+                    html += '</tr>';
                   });
                   html += '</tbody></table>';
                 }
@@ -1858,24 +1887,59 @@ html += '</div>';
 
               container.innerHTML = html;
 
-              // 全体合計の表示を更新（給与総額も含める）
+              // 💡 全体合計 ＋ 製造・レストラン別の内訳を表示
               if (grandTotal) {
-                // 💡 交通費の税込実費を1.1で割り戻して税抜金額にする（四捨五入）
                 var taxExcludedTransport = Math.round(gTotalCost / 1.1);
-                // 💡 給与総額と税抜交通費を足して、指定期間の総合計（税抜）を出す
                 var grandTotalExcludingTax = grandTotalSalary + taxExcludedTransport;
 
-                document.getElementById('grandTotalText').innerHTML = 
-                  '労働合計: ' + grandTotal.totalWorkHoursStr + 
+                var mfgTransportExTax = Math.round((grandTotal.mfgCost || 0) / 1.1);
+                var mfgTotalExTax = grandMfgSalary + mfgTransportExTax;
+
+                var restTransportExTax = Math.round((grandTotal.restCost || 0) / 1.1);
+                var restTotalExTax = grandRestSalary + restTransportExTax;
+
+                var summaryHtml = '';
+                summaryHtml += '<div style="margin-bottom:8px;">';
+                summaryHtml += '労働合計: ' + grandTotal.totalWorkHoursStr + 
                   ' ／ 給与総額合計: ¥' + grandTotalSalary.toLocaleString() + 
                   ' ／ 交通費合計 (税抜): ¥' + taxExcludedTransport.toLocaleString() + 
-                  ' <span style="margin-left:12px; padding-left:12px; border-left:2px solid #93c5fd; color:#b45309; font-weight:bold; font-size:1.05em;">総合計 (税抜): ¥' + grandTotalExcludingTax.toLocaleString() + '</span>';
-                
+                  ' <span style="margin-left:10px; padding-left:10px; border-left:2px solid #93c5fd; color:#b45309; font-weight:bold; font-size:1.05em;">総合計 (税抜): ¥' + grandTotalExcludingTax.toLocaleString() + '</span>';
+                summaryHtml += '</div>';
+
+                summaryHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; padding-top:8px; border-top:1px dashed #93c5fd; font-size:0.8rem;">';
+                summaryHtml += '<div style="flex:1; min-width:260px; background:#ffffff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 10px; color:#1e3a8a;">';
+                summaryHtml += '<strong>🏭 製造：</strong> ' + (grandTotal.mfgWorkHoursStr || '0時間0分') + ' ／ 給与 ¥' + grandMfgSalary.toLocaleString() + ' ／ 交通費(税抜) ¥' + mfgTransportExTax.toLocaleString() + ' ／ <strong style="color:#1d4ed8;">計 ¥' + mfgTotalExTax.toLocaleString() + '</strong>';
+                summaryHtml += '</div>';
+                summaryHtml += '<div style="flex:1; min-width:260px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:8px 10px; color:#92400e;">';
+                summaryHtml += '<strong>🍽️ レストラン：</strong> ' + (grandTotal.restWorkHoursStr || '0時間0分') + ' ／ 給与 ¥' + grandRestSalary.toLocaleString() + ' ／ 交通費(税抜) ¥' + restTransportExTax.toLocaleString() + ' ／ <strong style="color:#b45309;">計 ¥' + restTotalExTax.toLocaleString() + '</strong>';
+                summaryHtml += '</div>';
+                summaryHtml += '</div>';
+
+                document.getElementById('grandTotalText').innerHTML = summaryHtml;
                 totalBox.style.display = 'block';
               }
             }
           }).getEffectiveHourlyWage(item.staffId, periodInfo.yearMonth, periodInfo.half);
         });
+      }
+
+      // 💡 日別の請求区分（製造 / レストラン）を更新して再集計する関数
+      function changeKintaiCategory(requestId, newCategory, selectEl) {
+        if (selectEl) selectEl.disabled = true;
+        google.script.run
+          .withSuccessHandler(function(res) {
+            showToast(res.message, res.success);
+            if (res.success) {
+              fetchSummary(); // 再集計して製造・レストランの内訳を即時反映
+            } else if (selectEl) {
+              selectEl.disabled = false;
+            }
+          })
+          .withFailureHandler(function(err) {
+            alert('通信エラー: ' + err.message);
+            if (selectEl) selectEl.disabled = false;
+          })
+          .updateKintaiBillingCategory(requestId, newCategory);
       }
 
       // 💡 個別スタッフの時給を保存する関数（これ一つに統合します）
@@ -3206,6 +3270,7 @@ var draggedSourceDate = null;
       }
       
     </script>
+
 <!-- 📄 請求書発行 モーダルポップアップ -->
 <div id="invoiceModal" class="modal-overlay">
   <div class="modal-content" style="max-width: 600px;">
@@ -3215,20 +3280,27 @@ var draggedSourceDate = null;
     </div>
 
     <p style="font-size: 0.8rem; color: var(--text-sub); margin-top: 0;">
-      対象期間を選択して「プレビュー」を押すと、時給ごとの合計時間と金額が計算されます。<br>
+      対象期間と請求区分（製造 / レストラン）を選択して「プレビュー」を押すと、時給ごとの合計時間と金額が計算されます。<br>
       内容に間違いがなければ、PDFを発行してください。
     </p>
     
-    <div class="flex-row" style="align-items: flex-end; gap: 10px; margin-bottom: 16px;">
-      <div class="flex-col">
+    <div class="flex-row" style="align-items: flex-end; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+      <div class="flex-col" style="min-width: 130px;">
         <label>対象月</label>
-        <input type="month" id="invoiceMonthInput" style="margin-top:4px;">
+        <input type="month" id="invoiceMonthInput" onchange="previewInvoiceData()" style="margin-top:4px;">
       </div>
-      <div class="flex-col">
+      <div class="flex-col" style="min-width: 140px;">
         <label>対象期間（半期）</label>
-        <select id="invoiceHalfInput" style="margin-top:4px;">
+        <select id="invoiceHalfInput" onchange="previewInvoiceData()" style="margin-top:4px;">
           <option value="first">前半 (1日 〜 15日)</option>
           <option value="second">後半 (16日 〜 末日)</option>
+        </select>
+      </div>
+      <div class="flex-col" style="min-width: 120px;">
+        <label>請求区分</label>
+        <select id="invoiceCategoryInput" onchange="previewInvoiceData()" style="margin-top:4px; font-weight:bold;">
+          <option value="製造">🏭 製造</option>
+          <option value="レストラン">🍽️ レストラン</option>
         </select>
       </div>
       <button type="button" class="secondary" style="margin-bottom:0;" onclick="previewInvoiceData()">🔄 プレビュー</button>
@@ -3278,7 +3350,6 @@ var draggedSourceDate = null;
 </div>
 
 <script>
-  // 💡 請求書発行用のスクリプト
   var cachedInvoiceSummary = null;
 
   function openInvoiceModal() {
@@ -3290,6 +3361,7 @@ var draggedSourceDate = null;
     
     document.getElementById('invoiceMonthInput').value = y + '-' + m;
     document.getElementById('invoiceHalfInput').value = d <= 15 ? 'first' : 'second';
+    document.getElementById('invoiceCategoryInput').value = '製造';
     
     document.getElementById('invoicePreviewBox').style.display = 'none';
     document.getElementById('invoiceGenerateBtn').disabled = true;
@@ -3303,6 +3375,7 @@ var draggedSourceDate = null;
   function previewInvoiceData() {
     var ym = document.getElementById('invoiceMonthInput').value;
     var half = document.getElementById('invoiceHalfInput').value;
+    var category = document.getElementById('invoiceCategoryInput').value;
     
     if (!ym) return;
 
@@ -3320,14 +3393,14 @@ var draggedSourceDate = null;
           return;
         }
 
-        cachedInvoiceSummary = res; // データを保持しておく
+        cachedInvoiceSummary = res;
 
-        document.getElementById('invoicePreviewPeriodText').innerText = res.periodDisplay;
+        document.getElementById('invoicePreviewPeriodText').innerText = '【' + res.category + '】' + res.periodDisplay;
         
         var tbody = document.getElementById('invoicePreviewTableBody');
         var html = '';
         if (res.details.length === 0) {
-          html = '<tr><td colspan="3" style="text-align:center; color:#94a3b8; border:none; padding:12px;">この期間の労働実績はありません</td></tr>';
+          html = '<tr><td colspan="3" style="text-align:center; color:#94a3b8; border:none; padding:12px;">この期間・区分の労働実績はありません</td></tr>';
         } else {
           res.details.forEach(function(d) {
             html += '<tr>';
@@ -3346,7 +3419,6 @@ var draggedSourceDate = null;
 
         document.getElementById('invoicePreviewBox').style.display = 'block';
         
-        // 実績がある場合のみ発行ボタンを有効化
         if (res.details.length > 0) {
           document.getElementById('invoiceGenerateBtn').disabled = false;
         }
@@ -3355,7 +3427,7 @@ var draggedSourceDate = null;
         document.getElementById('invoiceLoadingMsg').style.display = 'none';
         alert('通信エラー: ' + err.message);
       })
-      .getInvoiceSummaryData(ym, half);
+      .getInvoiceSummaryData(ym, half, category);
   }
 
   function executeInvoiceGeneration() {
@@ -3371,7 +3443,6 @@ var draggedSourceDate = null;
     google.script.run
       .withSuccessHandler(function(res) {
         if (res.success) {
-          // Base64データからPDFを作成してダウンロードさせる
           var byteCharacters = atob(res.base64);
           var byteNumbers = new Array(byteCharacters.length);
           for (var i = 0; i < byteCharacters.length; i++) {
